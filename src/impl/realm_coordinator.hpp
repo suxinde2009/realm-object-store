@@ -20,6 +20,7 @@
 #define REALM_COORDINATOR_HPP
 
 #include "shared_realm.hpp"
+#include "impl/sync_fwd.hpp"
 
 #include <mutex>
 
@@ -43,6 +44,15 @@ public:
     // Get the coordinator for the given path, or null if there is none
     static std::shared_ptr<RealmCoordinator> get_existing_coordinator(StringData path);
 
+    static void set_sync_log_level(util::Logger::Level) noexcept;
+    static void set_sync_logger_factory(SyncLoggerFactory&) noexcept;
+
+    using SyncTransactCallback = std::function<void(std::uint_fast64_t)>;
+    // Ignores the specified callback if the session exists already
+    static std::shared_ptr<SyncSession> get_sync_session(std::string path, std::string server_url,
+                                                         std::string access_token,
+                                                         SyncTransactCallback);
+
     // Get a thread-local shared Realm with the given configuration
     // If the Realm is already open on another thread, validates that the given
     // configuration is compatible with the existing one
@@ -57,7 +67,7 @@ public:
 
     // Asynchronously call notify() on every Realm instance for this coordinator's
     // path, including those in other processes
-    void send_commit_notifications();
+    void send_commit_notifications(Realm&);
 
     // Clear the weak Realm cache for all paths
     // Should only be called in test code, as continuing to use the previously
@@ -88,6 +98,8 @@ public:
     void advance_to_ready(Realm& realm);
     void process_available_async(Realm& realm);
 
+    void notify_others();
+
 private:
     Realm::Config m_config;
     Schema m_schema;
@@ -113,6 +125,8 @@ private:
     std::exception_ptr m_async_error;
 
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
+
+    std::shared_ptr<SyncSession> m_sync_session;
 
     // must be called with m_notifier_mutex locked
     void pin_version(uint_fast64_t version, uint_fast32_t index);

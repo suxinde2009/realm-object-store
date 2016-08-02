@@ -23,6 +23,7 @@
 #include "util/thread_id.hpp"
 
 #include <realm/util/optional.hpp>
+#include <realm/util/logger.hpp>
 
 #include <memory>
 #include <thread>
@@ -104,6 +105,11 @@ enum class SchemaMode : uint8_t {
     Manual
 };
 
+class SyncLoggerFactory {
+public:
+    virtual std::unique_ptr<util::Logger> make_logger(util::Logger::Level) = 0;
+};
+
 class Realm : public std::enable_shared_from_this<Realm> {
 public:
     // A callback function to be called during a migration for Automatic and
@@ -149,7 +155,13 @@ public:
         // everything can be done deterministically on one thread, and
         // speeds up tests that don't need notifications.
         bool automatic_change_notifications = true;
+
+        util::Optional<std::string> sync_server_url;
+        util::Optional<std::string> sync_user_token;
     };
+
+    static void set_sync_log_level(util::Logger::Level) noexcept;
+    static void set_sync_logger_factory(SyncLoggerFactory&) noexcept;
 
     // Get a cached Realm or create a new one if no cached copies exists
     // Caching is done by path - mismatches for in_memory, schema mode or

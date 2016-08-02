@@ -28,6 +28,8 @@
 
 #include <realm/commit_log.hpp>
 #include <realm/group_shared.hpp>
+#include <realm/sync/history.hpp>
+#include <realm/lang_bind_helper.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -140,7 +142,18 @@ void Realm::open_with_config(const Config& config,
             read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);
         }
         else {
-            history = realm::make_client_history(config.path, config.encryption_key.data());
+            // FIXME: The SharedGroup constructor, when called below, will
+            // throw a C++ exception if server_synchronization_mode is
+            // inconsistent with the accessed Realm file. This exception
+            // probably has to be transmuted to an NSError.
+            bool server_synchronization_mode = bool(config.sync_server_url);
+            if (server_synchronization_mode) {
+                history = realm::sync::make_sync_history(config.path);
+            }
+            else {
+                history = realm::make_client_history(config.path, config.encryption_key.data());
+            }
+
             SharedGroup::DurabilityLevel durability = config.in_memory ? SharedGroup::durability_MemOnly :
                                                                            SharedGroup::durability_Full;
             shared_group = std::make_unique<SharedGroup>(*history, durability, config.encryption_key.data(), !config.disable_format_upgrade,
@@ -171,6 +184,16 @@ Group& Realm::read_group()
         add_schema_change_handler();
     }
     return *m_group;
+}
+
+void Realm::set_sync_log_level(util::Logger::Level level) noexcept
+{
+    RealmCoordinator::set_sync_log_level(level);
+}
+
+void Realm::set_sync_logger_factory(SyncLoggerFactory& factory) noexcept
+{
+    RealmCoordinator::set_sync_logger_factory(factory);
 }
 
 SharedRealm Realm::get_shared_realm(Config config)
@@ -392,7 +415,7 @@ void Realm::commit_transaction()
     }
 
     transaction::commit(*m_shared_group, m_binding_context.get());
-    m_coordinator->send_commit_notifications();
+    m_coordinator->send_commit_notifications(*this);
 }
 
 void Realm::cancel_transaction()
