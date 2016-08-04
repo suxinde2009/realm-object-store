@@ -66,7 +66,7 @@ GlobalNotifierBase::GlobalNotifierBase(std::shared_ptr<AsyncTarget> async_target
 void GlobalNotifierBase::start()
 {
     std::string local_path = m_local_admin_realm_path; // Throws (copy)
-    std::string virtual_path = "/public/admin"; // Throws (copy)
+    std::string virtual_path = "/admin"; // Throws (copy)
     std::string server_url = util_Uri_resolve(virtual_path, m_server_base_url); // Throws
     std::string access_token = m_access_token; // Throws (copy)
     using version_type = sync::Session::version_type;
@@ -175,7 +175,6 @@ std::string GlobalNotifierBase::get_local_path(const std::string& realm_id) cons
 
 std::string GlobalNotifierBase::get_server_url(const std::string& realm_name) const
 {
-    std::string path = "/public" + realm_name; // Throws
-    std::string server_url = util_Uri_resolve(path, m_server_base_url); // Throws
+    std::string server_url = util_Uri_resolve(realm_name, m_server_base_url); // Throws
     return server_url;
 }
