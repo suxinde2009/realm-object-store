@@ -7,6 +7,7 @@ set(SOURCES
     results.cpp
     schema.cpp
     shared_realm.cpp
+    sort.cpp
     thread_confined.cpp
     impl/collection_change_builder.cpp
     impl/collection_notifier.cpp
@@ -29,6 +30,7 @@ set(HEADERS
     results.hpp
     schema.hpp
     shared_realm.hpp
+    sort.hpp
     thread_confined.hpp
     impl/collection_change_builder.hpp
     impl/collection_notifier.hpp

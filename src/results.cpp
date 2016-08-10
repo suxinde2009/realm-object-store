@@ -23,6 +23,7 @@
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "schema.hpp"
+#include "sort.hpp"
 #include "util/compiler.hpp"
 #include "util/format.hpp"
 
@@ -481,9 +482,9 @@ TableView Results::get_tableview()
     REALM_UNREACHABLE();
 }
 
-Results Results::sort(realm::SortDescriptor&& sort) const
+Results Results::sort(TransientSortDescriptor sort) const
 {
-    return Results(m_realm, get_query(), std::move(sort));
+    return Results(m_realm, get_query(), std::move(sort).for_table(*m_table));
 }
 
 Results Results::filter(Query&& q) const

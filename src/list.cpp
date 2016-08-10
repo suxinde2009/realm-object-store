@@ -24,6 +24,7 @@
 #include "results.hpp"
 #include "schema.hpp"
 #include "shared_realm.hpp"
+#include "sort.hpp"
 #include "util/format.hpp"
 
 #include <realm/link_view.hpp>
@@ -183,10 +184,10 @@ void List::delete_all()
     m_link_view->remove_all_target_rows();
 }
 
-Results List::sort(SortDescriptor order)
+Results List::sort(TransientSortDescriptor order)
 {
     verify_attached();
-    return Results(m_realm, m_link_view, util::none, std::move(order));
+    return Results(m_realm, m_link_view, util::none, std::move(order).for_table(m_link_view->get_target_table()));
 }
 
 Results List::filter(Query q)

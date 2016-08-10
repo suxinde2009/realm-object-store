@@ -26,6 +26,7 @@
 #include "property.hpp"
 #include "results.hpp"
 #include "schema.hpp"
+#include "sort.hpp"
 
 #include <realm/commit_log.hpp>
 #include <realm/group_shared.hpp>
@@ -320,7 +321,7 @@ TEST_CASE("results: notifications") {
     }
 
     // Sort in descending order
-    results = results.sort({*table, {{0}}, {false}});
+    results = results.sort({{{0}}, {false}});
 
     SECTION("sorted notifications") {
         int notification_calls = 0;

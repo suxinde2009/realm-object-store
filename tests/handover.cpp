@@ -26,6 +26,7 @@
 #include "object_schema.hpp"
 #include "property.hpp"
 #include "schema.hpp"
+#include "sort.hpp"
 
 #include <realm/commit_log.hpp>
 #include <realm/util/optional.hpp>
@@ -341,7 +342,7 @@ TEST_CASE("handover") {
 
         SECTION("results") {
             auto& table = *get_table(*r, string_object);
-            auto results = Results(r, table.where().not_equal(0, "C")).sort({table, {{0}}, {false}});
+            auto results = Results(r, table.where().not_equal(0, "C")).sort({{{0}}, {false}});
 
             r->begin_transaction();
             Object strA = create_object(r, string_object);

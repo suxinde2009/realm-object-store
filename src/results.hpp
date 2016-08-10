@@ -31,6 +31,7 @@ template<typename T> class BasicRowExpr;
 using RowExpr = BasicRowExpr<Table>;
 class Mixed;
 class ObjectSchema;
+class TransientSortDescriptor;
 
 namespace _impl {
     class ResultsNotifier;
@@ -102,7 +103,7 @@ public:
 
     // Create a new Results by further filtering or sorting this Results
     Results filter(Query&& q) const;
-    Results sort(SortDescriptor&& sort) const;
+    Results sort(TransientSortDescriptor sort) const;
 
     // Return a snapshot of this Results that never updates to reflect changes in the underlying data.
     Results snapshot() const &;
