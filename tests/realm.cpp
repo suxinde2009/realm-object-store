@@ -27,7 +27,8 @@
 #include "schema.hpp"
 
 #include <realm/group.hpp>
-#include <realm/util/file.hpp>
+
+#include <unistd.h>
 
 using namespace realm;
 
@@ -173,7 +174,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 }
 
 TEST_CASE("SharedRealm: notifications") {
-    if (!util::has_event_loop_implementation())
+    if (!util::EventLoop::has_implementation())
         return;
 
     TestFile config;
@@ -211,7 +212,7 @@ TEST_CASE("SharedRealm: notifications") {
         r2->begin_transaction();
         r2->commit_transaction();
         REQUIRE(change_count == 0);
-        util::run_event_loop_until([&]{ return change_count > 0; });
+        util::EventLoop::main().run_until([&]{ return change_count > 0; });
         REQUIRE(change_count == 1);
     }
 }
