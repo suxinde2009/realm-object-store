@@ -42,7 +42,6 @@ class Replication;
 class SharedGroup;
 class StringData;
 struct SyncConfig;
-struct VersionID;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 
@@ -268,7 +267,6 @@ public:
     // without making it public to everyone
     class Internal {
         friend class AnyThreadConfined;
-        friend class GlobalNotifier;
         friend class _impl::CollectionNotifier;
         friend class _impl::ListNotifier;
         friend class _impl::RealmCoordinator;

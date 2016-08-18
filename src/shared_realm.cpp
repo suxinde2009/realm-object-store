@@ -187,11 +187,14 @@ void Realm::open_with_config(const Config& config,
             if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
                 history = realm::sync::make_sync_history(config.path);
+#else
+                REALM_TERMINATE("Realm was not built with sync enabled");
 #endif
             }
             else {
                 history = realm::make_in_realm_history(config.path);
             }
+
             SharedGroupOptions options;
             options.durability = config.in_memory ? SharedGroupOptions::Durability::MemOnly :
                                                     SharedGroupOptions::Durability::Full;
