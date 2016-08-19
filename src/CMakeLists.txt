@@ -1,5 +1,6 @@
 set(SOURCES
     collection_notifications.cpp
+    global_notifier.cpp
     index_set.cpp
     list.cpp
     object_schema.cpp
@@ -24,6 +25,7 @@ set(SOURCES
 
 set(HEADERS
     collection_notifications.hpp
+    global_notifier.hpp
     index_set.hpp
     list.hpp
     object_schema.hpp
