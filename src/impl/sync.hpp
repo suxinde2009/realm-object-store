@@ -76,7 +76,7 @@ public:
 
     SyncSession(std::shared_ptr<SyncClient> client, std::string path, std::string server_url,
                 std::string access_token,
-                std::function<sync::Session::SyncTransactCallback> sync_transact_callback):
+                std::function<void (VersionID, VersionID)> sync_transact_callback):
         client(std::move(client)),
         path(std::move(path)),
         server_url(std::move(server_url)),

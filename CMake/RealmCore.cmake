@@ -17,6 +17,7 @@
 ###########################################################################
 
 include(ExternalProject)
+include(ProcessorCount)
 
 if(${CMAKE_GENERATOR} STREQUAL "Unix Makefiles")
     set(MAKE_EQUAL_MAKE "MAKE=$(MAKE)")
@@ -26,6 +27,11 @@ set(MAKE_FLAGS "REALM_HAVE_CONFIG=1")
 
 if(SANITIZER_FLAGS)
   set(MAKE_FLAGS ${MAKE_FLAGS} "EXTRA_CFLAGS=${SANITIZER_FLAGS}" "EXTRA_LDFLAGS=${SANITIZER_FLAGS}")
+endif()
+
+ProcessorCount(NUM_JOBS)
+if(NOT NUM_JOBS EQUAL 0)
+    set(MAKE_FLAGS ${MAKE_FLAGS} "-j${NUM_JOBS}")
 endif()
 
 if (${CMAKE_VERSION} VERSION_GREATER "3.4.0")
@@ -171,7 +177,7 @@ function(build_realm_sync sync_directory)
         BUILD_IN_SOURCE 1
         BUILD_ALWAYS 1
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND make -C src/realm librealm-sync.a librealm-sync-dbg.a ${MAKE_FLAGS}
+        BUILD_COMMAND make -C src/realm all librealm-sync-dbg.a librealm-server-dbg.a ${MAKE_FLAGS}
         INSTALL_COMMAND ""
         ${USES_TERMINAL_BUILD}
         )
@@ -185,7 +191,6 @@ function(build_realm_sync sync_directory)
         DEPENDS realm
         DEPENDEES build
         )
-
     add_library(realm-sync STATIC IMPORTED)
     add_dependencies(realm-sync realm-sync-lib)
 
@@ -193,6 +198,27 @@ function(build_realm_sync sync_directory)
     set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION_COVERAGE ${sync_library_debug})
     set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION_RELEASE ${sync_library_release})
     set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION ${sync_library_release})
+
+    # Sync server library is built as part of the sync library build
+    ExternalProject_Add(realm-server-lib
+        DOWNLOAD_COMMAND ""
+        PREFIX ${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync
+        SOURCE_DIR ${sync_directory}
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND ""
+        INSTALL_COMMAND ""
+        )
+    set(sync_server_library_debug ${sync_directory}/src/realm/librealm-server-dbg.a)
+    set(sync_server_library_release ${sync_directory}/src/realm/librealm-server.a)
+    set(sync_server_libraries ${sync_library_debug} ${sync_library_release})
+
+    add_library(realm-sync-server STATIC IMPORTED)
+    add_dependencies(realm-sync-server realm-server-lib)
+
+    set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION_DEBUG ${sync_server_library_debug})
+    set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION_COVERAGE ${sync_server_library_debug})
+    set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION_RELEASE ${sync_server_library_release})
+    set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION ${sync_server_library_release})
 
     set(REALM_SYNC_INCLUDE_DIR ${sync_directory}/src PARENT_SCOPE)
 endfunction()
