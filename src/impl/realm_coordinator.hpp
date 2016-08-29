@@ -20,7 +20,6 @@
 #define REALM_COORDINATOR_HPP
 
 #include "shared_realm.hpp"
-#include "impl/sync_fwd.hpp"
 
 #include <realm/version_id.hpp>
 
@@ -36,6 +35,7 @@ namespace _impl {
 class CollectionNotifier;
 class ExternalCommitHelper;
 class WeakRealmNotifier;
+struct SyncSession;
 
 // RealmCoordinator manages the weak cache of Realm instances and communication
 // between per-thread Realm instances for a given file
@@ -47,9 +47,6 @@ public:
     static std::shared_ptr<RealmCoordinator> get_coordinator(const Realm::Config&);
     // Get the coordinator for the given path, or null if there is none
     static std::shared_ptr<RealmCoordinator> get_existing_coordinator(StringData path);
-
-    static void set_sync_log_level(util::Logger::Level) noexcept;
-    static void set_sync_logger_factory(SyncLoggerFactory&) noexcept;
 
     // Get a thread-local shared Realm with the given configuration
     // If the Realm is already open on another thread, validates that the given
@@ -130,7 +127,7 @@ private:
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
     std::function<void(VersionID, VersionID)> m_transaction_callback;
 
-    std::shared_ptr<SyncSession> m_sync_session;
+    std::unique_ptr<SyncSession> m_sync_session;
 
     // must be called with m_notifier_mutex locked
     void pin_version(uint_fast64_t version, uint_fast32_t index);

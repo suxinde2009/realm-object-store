@@ -16,15 +16,22 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_OBJECT_STORE_IMPL_SYNC_FWD_HPP
-#define REALM_OBJECT_STORE_IMPL_SYNC_FWD_HPP
+#ifndef REALM_OS_SYNC_CONFIG_HPP
+#define REALM_OS_SYNC_CONFIG_HPP
+
+#include <realm/sync/client.hpp>
 
 namespace realm {
-namespace _impl {
 
-class SyncSession;
+using SyncErrorHandler = std::function<sync::Client::ErrorHandler>;
 
-} // namespace _impl
-} // namespace realm
+struct SyncConfig {
+public:
+    std::string user_tag;
+    std::string realm_url;
+    SyncErrorHandler error_handler;
+};
 
-#endif // REALM_OBJECT_STORE_IMPL_SYNC_FWD_HPP
+} // realm
+
+#endif // REALM_OS_SYNC_CONFIG_HPP

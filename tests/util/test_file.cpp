@@ -22,6 +22,8 @@
 #include "util/format.hpp"
 #include "global_notifier.hpp"
 
+#include "sync_manager.hpp"
+
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/string_data.hpp>
 
@@ -97,7 +99,7 @@ sync::Client::Config TestLogger::client_config() {
 SyncServer::SyncServer()
 : m_server(util::make_temp_dir(), util::none, TestLogger::server_config())
 {
-    Realm::set_sync_log_level(util::Logger::Level::off);
+    SyncManager::shared().set_log_level(util::Logger::Level::off);
     uint64_t port;
     while (true) {
         // Try to pick a random available port, or loop forever if other

@@ -206,16 +206,6 @@ void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
     realm.add_schema_change_handler();
 }
 
-void Realm::set_sync_log_level(util::Logger::Level level) noexcept
-{
-    RealmCoordinator::set_sync_log_level(level);
-}
-
-void Realm::set_sync_logger_factory(SyncLoggerFactory& factory) noexcept
-{
-    RealmCoordinator::set_sync_logger_factory(factory);
-}
-
 SharedRealm Realm::get_shared_realm(Config config)
 {
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
