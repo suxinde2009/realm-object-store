@@ -8,6 +8,7 @@ set(SOURCES
     schema.cpp
     shared_realm.cpp
     thread_confined.cpp
+
     impl/collection_change_builder.cpp
     impl/collection_notifier.cpp
     impl/handover.cpp
@@ -59,10 +60,9 @@ set(HEADERS
     util/compiler.hpp
     util/event_loop_signal.hpp
     util/format.hpp
-    util/format.hpp
     util/thread_id.hpp
     util/thread_local.hpp
-    )
+)
 
 if(APPLE)
     list(APPEND SOURCES impl/apple/external_commit_helper.cpp)
@@ -77,6 +77,10 @@ set(INCLUDE_DIRS
     ${PEGTL_INCLUDE_DIR}
     ${UV_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Add the sync files separately to reduce merge conflicts.
+find_package(ZLIB REQUIRED)
+list(APPEND INCLUDE_DIRS ${REALM_SYNC_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS})
 
 # An object library to group together the compilation of the source files.
 add_library(realm-object-store-objects OBJECT ${SOURCES} ${HEADERS})
@@ -94,3 +98,7 @@ target_link_libraries(realm-object-store-static PUBLIC realm ${PLATFORM_LIBRARIE
 add_library(realm-object-store SHARED $<TARGET_OBJECTS:realm-object-store-objects> placeholder.cpp)
 target_include_directories(realm-object-store PUBLIC ${INCLUDE_DIRS})
 target_link_libraries(realm-object-store PRIVATE realm ${PLATFORM_LIBRARIES})
+
+# Add the sync libraries separately to reduce merge conflicts.
+target_link_libraries(realm-object-store-static PUBLIC realm-sync ${ZLIB_LIBRARIES})
+target_link_libraries(realm-object-store PRIVATE realm-sync ${ZLIB_LIBRARIES})
