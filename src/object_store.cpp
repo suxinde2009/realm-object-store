@@ -136,9 +136,13 @@ void copy_property_values(Property const& prop, Table& table)
 {
     auto copy_property_values = [&](auto getter, auto setter) {
         for (size_t i = 0, count = table.size(); i < count; i++) {
+#if REALM_VER_MAJOR >= 2
             bool is_default = false;
             (table.*setter)(prop.table_column, i, (table.*getter)(prop.table_column + 1, i),
                             is_default);
+#else
+            (table.*setter)(prop.table_column, i, (table.*getter)(prop.table_column + 1, i));
+#endif
         }
     };
 
@@ -252,7 +256,7 @@ StringData ObjectStore::object_type_for_table_name(StringData table_name) {
 }
 
 std::string ObjectStore::table_name_for_object_type(StringData object_type) {
-    return std::string(c_object_table_prefix) + object_type.data();
+    return std::string(c_object_table_prefix) + std::string(object_type);
 }
 
 TableRef ObjectStore::table_for_object_type(Group& group, StringData object_type) {
@@ -453,7 +457,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         void operator()(RemoveProperty op) { table(op.object).remove_column(op.property->table_column); }
         void operator()(MakePropertyNullable op) { make_property_optional(group, table(op.object), *op.property); }
         void operator()(MakePropertyRequired op) { make_property_required(group, table(op.object), *op.property); }
-        void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name, op.property->name); }
+        void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name, op.property ? StringData{op.property->name} : ""); }
         void operator()(AddIndex op) { add_index(table(op.object), op.property->table_column); }
         void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
 
