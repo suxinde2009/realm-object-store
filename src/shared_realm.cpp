@@ -586,7 +586,7 @@ util::Optional<int> Realm::file_format_upgraded_from_version() const
 
 Realm::HandoverPackage::HandoverPackage(HandoverPackage&&) = default;
 Realm::HandoverPackage& Realm::HandoverPackage::operator=(HandoverPackage&&) = default;
-Realm::HandoverPackage::VersionID::VersionID() : VersionID(SharedGroup::VersionID()) { };
+Realm::HandoverPackage::VersionID::VersionID() : VersionID(SharedGroup::VersionID()) { }
 
 // Precondition: `m_version` is not greater than `new_version`
 // Postcondition: `m_version` is equal to `new_version`
@@ -664,6 +664,7 @@ std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage han
     if (!m_group) {
         // A read transaction doesn't yet exist, so create at the handover version
         m_group = &const_cast<Group&>(m_shared_group->begin_read(handover.m_version_id));
+        add_schema_change_handler();
     }
     else {
         auto current_version = m_shared_group->get_version_of_current_transaction();
