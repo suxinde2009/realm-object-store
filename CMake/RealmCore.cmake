@@ -226,6 +226,7 @@ function(build_realm_sync sync_directory)
     set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION_COVERAGE ${sync_server_library_debug})
     set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION_RELEASE ${sync_server_library_release})
     set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION ${sync_server_library_release})
+    set_property(TARGET realm-sync-server PROPERTY INTERFACE_LINK_LIBRARIES -lcrypto)
 
     set(REALM_SYNC_INCLUDE_DIR ${sync_directory}/src PARENT_SCOPE)
 endfunction()
