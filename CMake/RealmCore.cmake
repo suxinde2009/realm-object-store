@@ -210,7 +210,14 @@ function(build_realm_sync sync_directory)
         )
     set(sync_server_library_debug ${sync_directory}/src/realm/librealm-server-dbg.a)
     set(sync_server_library_release ${sync_directory}/src/realm/librealm-server.a)
-    set(sync_server_libraries ${sync_library_debug} ${sync_library_release})
+    set(sync_server_libraries ${sync_server_library_debug} ${sync_server_library_release})
+
+    ExternalProject_Add_Step(realm-server-lib ensure-server-libraries
+        COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${sync_server_libraries}
+        OUTPUT ${sync_server_libraries}
+        DEPENDS realm
+        DEPENDEES build
+        )
 
     add_library(realm-sync-server STATIC IMPORTED)
     add_dependencies(realm-sync-server realm-server-lib)
