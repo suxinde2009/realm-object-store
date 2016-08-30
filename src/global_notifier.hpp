@@ -161,7 +161,7 @@ public:
     /// to a particular Realm.
     ///
     /// The Realm name that is passed to the callback is hierarchical and takes
-    /// the form of an abosulte path (separated by forward slashes). This is a
+    /// the form of an absolute path (separated by forward slashes). This is a
     /// *virtual path*, i.e, it is not necesarily the file system path of the
     /// Realm on the server.
     ///
@@ -173,13 +173,17 @@ public:
     /// of the synchronization mechanism. This function is not called as a
     /// result of changing the Realm locally.
     ///
+    /// This will also be called once for each Realm which already exists locally
+    /// on disk when the notifier is started, even if there are no changes.
     ///
     /// \param new_realm The Realm which changed, with the changes applied.
     /// `modifications_new` and `insertions` within the change sets are indices
     /// in this Realm.
     ///
     /// \param changes The changes for each object type which changed. Will be
-    /// empty when?
+    /// empty only if this is a notification of a pre-existing Realm. Sync
+    /// transactions which do not have any data changes do not produce a
+    /// notification at all.
     virtual void realm_changed(GlobalNotifier::ChangeNotification changes) = 0;
 };
 

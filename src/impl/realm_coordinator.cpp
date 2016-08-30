@@ -77,7 +77,7 @@ std::shared_ptr<RealmCoordinator> RealmCoordinator::get_coordinator(const Realm:
 {
     auto coordinator = get_coordinator(config.path);
     std::lock_guard<std::mutex> lock(coordinator->m_realm_mutex);
-    coordinator->validate_config(config);
+    coordinator->set_config(config);
     return coordinator;
 }
 
@@ -136,7 +136,7 @@ void RealmCoordinator::create_sync_session()
                                          std::move(sync_transact_callback))); // Throws
 }
 
-void RealmCoordinator::validate_config(const Realm::Config& config)
+void RealmCoordinator::set_config(const Realm::Config& config)
 {
     if ((!m_config.read_only() && !m_notifier) || (m_config.read_only() && m_weak_realm_notifiers.empty())) {
         m_config = config;
@@ -173,7 +173,7 @@ void RealmCoordinator::validate_config(const Realm::Config& config)
 std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
 {
     std::lock_guard<std::mutex> lock(m_realm_mutex);
-    validate_config(config);
+    set_config(config);
 
     if (config.cache) {
         for (auto& cached_realm : m_weak_realm_notifiers) {

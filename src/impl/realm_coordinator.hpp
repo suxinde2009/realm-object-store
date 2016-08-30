@@ -135,7 +135,7 @@ private:
     // must be called with m_notifier_mutex locked
     void pin_version(uint_fast64_t version, uint_fast32_t index);
 
-    void validate_config(const Realm::Config&);
+    void set_config(const Realm::Config&);
     void create_sync_session();
     void run_async_notifiers();
     void open_helper_shared_group();
