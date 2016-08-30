@@ -177,7 +177,7 @@ function(build_realm_sync sync_directory)
         BUILD_IN_SOURCE 1
         BUILD_ALWAYS 1
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND make -C src/realm all librealm-sync-dbg.a librealm-server-dbg.a ${MAKE_FLAGS}
+        BUILD_COMMAND make -C src/realm librealm-sync.a librealm-sync-dbg.a librealm-server.a librealm-server-dbg.a ${MAKE_FLAGS}
         INSTALL_COMMAND ""
         ${USES_TERMINAL_BUILD}
         )
