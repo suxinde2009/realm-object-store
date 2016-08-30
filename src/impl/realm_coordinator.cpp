@@ -38,8 +38,6 @@
 using namespace realm;
 using namespace realm::_impl;
 
-
-
 namespace {
 
 std::mutex s_sync_mutex;
@@ -52,12 +50,6 @@ SyncLoggerFactory* s_sync_logger_factory = nullptr;
 
 // The shared sync client. Protected by s_sync_mutex
 std::weak_ptr<SyncClient> s_weak_sync_client;
-
-// Sync sessions by local file-system path. Protected by s_sync_mutex.
-//
-// FIXME: Broken weak references are never cleaned up, so a small amount of
-// memory is "leaked" for each path.
-std::unordered_map<std::string, std::weak_ptr<SyncSession>> s_weak_sync_sessions;
 
 std::mutex s_coordinator_mutex;
 
@@ -81,6 +73,14 @@ std::shared_ptr<RealmCoordinator> RealmCoordinator::get_coordinator(StringData p
     return coordinator;
 }
 
+std::shared_ptr<RealmCoordinator> RealmCoordinator::get_coordinator(const Realm::Config& config)
+{
+    auto coordinator = get_coordinator(config.path);
+    std::lock_guard<std::mutex> lock(coordinator->m_realm_mutex);
+    coordinator->set_config(config);
+    return coordinator;
+}
+
 std::shared_ptr<RealmCoordinator> RealmCoordinator::get_existing_coordinator(StringData path)
 {
     std::lock_guard<std::mutex> lock(s_coordinator_mutex);
@@ -100,12 +100,12 @@ void RealmCoordinator::set_sync_logger_factory(SyncLoggerFactory& factory) noexc
     s_sync_logger_factory = &factory;
 }
 
-std::shared_ptr<SyncSession> RealmCoordinator::get_sync_session(std::string path, std::string server_url,
-                                                                std::string access_token,
-                                                                SyncTransactCallback sync_transact_callback)
+void RealmCoordinator::create_sync_session()
 {
-    std::lock_guard<std::mutex> l(s_sync_mutex);
+    if (m_sync_session)
+        return;
 
+    std::lock_guard<std::mutex> l(s_sync_mutex);
     std::shared_ptr<SyncClient> client = s_weak_sync_client.lock();
     if (!client) {
         std::unique_ptr<util::Logger> logger;
@@ -113,7 +113,7 @@ std::shared_ptr<SyncSession> RealmCoordinator::get_sync_session(std::string path
             logger = s_sync_logger_factory->make_logger(s_sync_log_level); // Throws
         }
         else {
-            std::unique_ptr<util::StderrLogger> stderr_logger(new util::StderrLogger); // Throws
+            auto stderr_logger = std::make_unique<util::StderrLogger>(); // Throws
             stderr_logger->set_level_threshold(s_sync_log_level);
             logger = std::move(stderr_logger);
         }
@@ -121,27 +121,23 @@ std::shared_ptr<SyncSession> RealmCoordinator::get_sync_session(std::string path
         s_weak_sync_client = client;
     }
 
-    auto& weak_sync_session = s_weak_sync_sessions[path];
-    std::shared_ptr<SyncSession> session = weak_sync_session.lock();
-    if (session) {
-        if (server_url != session->server_url)
-            throw std::runtime_error("Server URL mismatch");
-        if (access_token != session->access_token)
-            throw std::runtime_error("Access token mismatch");
-    }
-    else {
-        session.reset(new SyncSession(std::move(client), std::move(path), std::move(server_url),
-                                      std::move(access_token),
-                                      std::move(sync_transact_callback))); // Throws
-        weak_sync_session = session;
-    }
+    std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
+    auto sync_transact_callback = [weak_self](VersionID old_version, VersionID new_version) {
+        if (auto self = weak_self.lock()) {
+            if (self->m_transaction_callback)
+                self->m_transaction_callback(old_version, new_version);
+            self->notify_others();
+        }
+    };
 
-    return session;
+    m_sync_session.reset(new SyncSession(std::move(client), m_config.path,
+                                         *m_config.sync_server_url,
+                                         *m_config.sync_user_token,
+                                         std::move(sync_transact_callback))); // Throws
 }
 
-std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
+void RealmCoordinator::set_config(const Realm::Config& config)
 {
-    std::lock_guard<std::mutex> lock(m_realm_mutex);
     if ((!m_config.read_only() && !m_notifier) || (m_config.read_only() && m_weak_realm_notifiers.empty())) {
         m_config = config;
     }
@@ -162,13 +158,22 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
             throw MismatchedConfigException("Realm at path '%1' already opened with different schema version.", config.path);
         }
         if (m_config.sync_user_token != config.sync_user_token) {
-            throw MismatchedConfigException("Realm at path already opened with different user token.", config.path);
+            throw MismatchedConfigException("Realm at path '%1' already opened with different user token.", config.path);
         }
         if (m_config.sync_server_url != config.sync_server_url) {
-            throw MismatchedConfigException("Realm at path already opened with different server url.", config.path);
+            throw MismatchedConfigException("Realm at path '%1' already opened with different server url.", config.path);
         }
         // Realm::update_schema() handles complaining about schema mismatches
     }
+
+    if (config.sync_server_url && config.sync_user_token)
+        create_sync_session();
+}
+
+std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
+{
+    std::lock_guard<std::mutex> lock(m_realm_mutex);
+    set_config(config);
 
     if (config.cache) {
         for (auto& cached_realm : m_weak_realm_notifiers) {
@@ -180,19 +185,6 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
                 }
             }
         }
-    }
-
-    if (config.sync_server_url && config.sync_user_token && !m_sync_session) {
-        std::string path = config.path; // Throws (copy)
-        std::string server_url = *config.sync_server_url; // Throws (copy)
-        std::string access_token = *config.sync_user_token; // Throws (copy)
-        std::string path_2 = path; // Throws (copy)
-        auto sync_transact_callback = [path=std::move(path_2)](sync::Session::version_type) {
-            RealmCoordinator::get_coordinator(path)->notify_others(); // Throws
-        };
-        m_sync_session = get_sync_session(std::move(path), std::move(server_url),
-                                          std::move(access_token),
-                                          std::move(sync_transact_callback)); // Throws
     }
 
     auto realm = Realm::make_shared_realm(std::move(config));
@@ -689,5 +681,17 @@ void RealmCoordinator::process_available_async(Realm& realm)
 
 void RealmCoordinator::notify_others()
 {
-    m_notifier->notify_others();
+    if (m_notifier)
+        m_notifier->notify_others();
+}
+
+void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, VersionID)> fn)
+{
+    m_transaction_callback = std::move(fn);
+}
+
+void RealmCoordinator::wait_for_upload_complete()
+{
+    if (m_sync_session)
+        m_sync_session->session.wait_for_upload_complete_or_client_stopped();
 }

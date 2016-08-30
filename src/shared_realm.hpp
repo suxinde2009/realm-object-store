@@ -37,6 +37,7 @@ class Realm;
 class Replication;
 class SharedGroup;
 class StringData;
+struct VersionID;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 
@@ -282,6 +283,7 @@ public:
     // without making it public to everyone
     class Internal {
         friend class AnyThreadConfined;
+        friend class GlobalNotifier;
         friend class _impl::CollectionNotifier;
         friend class _impl::ListNotifier;
         friend class _impl::RealmCoordinator;
@@ -296,6 +298,8 @@ public:
         // coordinator to wake up the worker thread when a callback is
         // added, and coordinators need to be able to get themselves from a Realm
         static _impl::RealmCoordinator& get_coordinator(Realm& realm) { return *realm.m_coordinator; }
+
+        static void begin_read(Realm&, VersionID);
     };
 
     static void open_with_config(const Config& config,

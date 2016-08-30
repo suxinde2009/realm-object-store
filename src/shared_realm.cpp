@@ -191,6 +191,13 @@ Group& Realm::read_group()
     return *m_group;
 }
 
+void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
+{
+    REALM_ASSERT(!realm.m_group);
+    realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version_id));
+    realm.add_schema_change_handler();
+}
+
 void Realm::set_sync_log_level(util::Logger::Level level) noexcept
 {
     RealmCoordinator::set_sync_log_level(level);
