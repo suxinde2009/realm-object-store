@@ -657,3 +657,9 @@ void RealmCoordinator::wait_for_upload_complete()
     if (m_sync_session)
         m_sync_session->wait_for_upload_complete_or_client_stopped();
 }
+
+void RealmCoordinator::refresh_sync_access_token(std::string access_token, util::Optional<std::string> server_url)
+{
+    REALM_ASSERT(m_sync_session);
+    m_sync_session->refresh_sync_access_token(std::move(access_token), std::move(server_url));
+}

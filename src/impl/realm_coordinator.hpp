@@ -100,6 +100,9 @@ public:
     void set_transaction_callback(std::function<void(VersionID, VersionID)> fn);
     void wait_for_upload_complete();
 
+    // FIXME: Consider whether this function should live here
+    void refresh_sync_access_token(std::string access_token, util::Optional<std::string> server_url);
+
 private:
     Realm::Config m_config;
     Schema m_schema;
