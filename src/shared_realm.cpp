@@ -30,11 +30,16 @@
 
 #include "util/format.hpp"
 
-#include <realm/commit_log.hpp>
-#include <realm/group_shared.hpp>
 #include <realm/util/scope_exit.hpp>
 
+#if REALM_VER_MAJOR >= 2
+#include <realm/history.hpp>
+#else
+#include <realm/commit_log.hpp>
+#endif
+
 #include <realm/sync/history.hpp>
+
 
 using namespace realm;
 using namespace realm::_impl;
@@ -156,9 +161,12 @@ void Realm::open_with_config(const Config& config,
                 history = realm::sync::make_sync_history(config.path);
             }
             else {
-                history = realm::make_client_history(config.path, config.encryption_key.data());
+#if REALM_VER_MAJOR >= 2
+                history = realm::make_in_realm_history(config.path);
+#else
+                history = realm::make_client_history(config.path, config.encryption_key.data());       
+#endif
             }
-
             SharedGroup::DurabilityLevel durability = config.in_memory ? SharedGroup::durability_MemOnly :
                                                                            SharedGroup::durability_Full;
             shared_group = std::make_unique<SharedGroup>(*history, durability, config.encryption_key.data(), !config.disable_format_upgrade,
