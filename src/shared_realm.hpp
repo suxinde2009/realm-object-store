@@ -36,6 +36,7 @@ class Realm;
 class Replication;
 class SharedGroup;
 class StringData;
+struct SyncConfig;
 struct VersionID;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
@@ -155,6 +156,10 @@ public:
         // speeds up tests that don't need notifications.
         bool automatic_change_notifications = true;
 
+        /// A data structure storing data used to configure the Realm for sync support.
+        std::shared_ptr<SyncConfig> sync_config;
+
+        // FIXME: GlobalNotifier should use sync_config instead.
         util::Optional<std::string> sync_server_url;
         util::Optional<std::string> sync_user_token;
     };

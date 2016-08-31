@@ -94,8 +94,14 @@ void RealmCoordinator::create_sync_session()
         }
     });
 
-    // FIXME: Binding should be asynchronous like it is with the Cocoa binding.
-    m_sync_session->refresh_sync_access_token(*m_config.sync_user_token, m_config.sync_server_url);
+    if (m_config.sync_config) {
+        // Request the binding to bind the Realm at the earliest opportunity (immediately, or upon login).
+        SyncManager::shared().get_sync_login_function()(m_config);
+    }
+    else {
+        // FIXME: GlobalNotifier should use the same authentication flow as the binding.
+        m_sync_session->refresh_sync_access_token(*m_config.sync_user_token, m_config.sync_server_url);
+    }
 }
 
 void RealmCoordinator::set_config(const Realm::Config& config)
@@ -128,7 +134,7 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         // Realm::update_schema() handles complaining about schema mismatches
     }
 
-    if (config.sync_server_url && config.sync_user_token)
+    if (config.sync_config || (config.sync_server_url && config.sync_user_token))
         create_sync_session();
 }
 
