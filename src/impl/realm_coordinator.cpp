@@ -20,12 +20,14 @@
 
 #include "impl/collection_notifier.hpp"
 #include "impl/external_commit_helper.hpp"
-#include "impl/sync.hpp"
 #include "impl/transact_log_handler.hpp"
 #include "impl/weak_realm_notifier.hpp"
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "schema.hpp"
+
+#include "impl/sync_session.hpp"
+#include "sync_manager.hpp"
 
 #include <realm/group_shared.hpp>
 #include <realm/lang_bind_helper.hpp>
@@ -38,17 +40,6 @@ using namespace realm;
 using namespace realm::_impl;
 
 namespace {
-
-std::mutex s_sync_mutex;
-
-// Protected by s_sync_mutex
-util::Logger::Level s_sync_log_level = util::Logger::Level::info; // FIXME: Should probably be util::Logger::Level::error
-
-// Protected by s_sync_mutex
-SyncLoggerFactory* s_sync_logger_factory = nullptr;
-
-// The shared sync client. Protected by s_sync_mutex
-std::weak_ptr<SyncClient> s_weak_sync_client;
 
 std::mutex s_coordinator_mutex;
 
@@ -87,52 +78,30 @@ std::shared_ptr<RealmCoordinator> RealmCoordinator::get_existing_coordinator(Str
     return it == s_coordinators_per_path.end() ? nullptr : it->second.lock();
 }
 
-void RealmCoordinator::set_sync_log_level(util::Logger::Level level) noexcept
-{
-    std::lock_guard<std::mutex> l(s_sync_mutex);
-    s_sync_log_level = level;
-}
-
-void RealmCoordinator::set_sync_logger_factory(SyncLoggerFactory& factory) noexcept
-{
-    std::lock_guard<std::mutex> l(s_sync_mutex);
-    s_sync_logger_factory = &factory;
-}
-
 void RealmCoordinator::create_sync_session()
 {
     if (m_sync_session)
         return;
 
-    std::lock_guard<std::mutex> l(s_sync_mutex);
-    std::shared_ptr<SyncClient> client = s_weak_sync_client.lock();
-    if (!client) {
-        std::unique_ptr<util::Logger> logger;
-        if (s_sync_logger_factory) {
-            logger = s_sync_logger_factory->make_logger(s_sync_log_level); // Throws
-        }
-        else {
-            auto stderr_logger = std::make_unique<util::StderrLogger>(); // Throws
-            stderr_logger->set_level_threshold(s_sync_log_level);
-            logger = std::move(stderr_logger);
-        }
-        client.reset(new SyncClient(std::move(logger))); // Throws
-        s_weak_sync_client = client;
-    }
+    m_sync_session = SyncManager::shared().create_session(m_config.path); // Throws
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
-    auto sync_transact_callback = [weak_self](VersionID old_version, VersionID new_version) {
+    m_sync_session->set_sync_transact_callback([weak_self](VersionID old_version, VersionID new_version) {
         if (auto self = weak_self.lock()) {
             if (self->m_transaction_callback)
                 self->m_transaction_callback(old_version, new_version);
             self->notify_others();
         }
-    };
+    });
 
-    m_sync_session.reset(new SyncSession(std::move(client), m_config.path,
-                                         *m_config.sync_server_url,
-                                         *m_config.sync_user_token,
-                                         std::move(sync_transact_callback))); // Throws
+    if (m_config.sync_config) {
+        // Request the binding to bind the Realm at the earliest opportunity (immediately, or upon login).
+        SyncManager::shared().get_sync_login_function()(m_config);
+    }
+    else {
+        // FIXME: GlobalNotifier should use the same authentication flow as the binding.
+        m_sync_session->refresh_sync_access_token(*m_config.sync_user_token, m_config.sync_server_url);
+    }
 }
 
 void RealmCoordinator::set_config(const Realm::Config& config)
@@ -165,7 +134,7 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         // Realm::update_schema() handles complaining about schema mismatches
     }
 
-    if (config.sync_server_url && config.sync_user_token)
+    if (config.sync_config || (config.sync_server_url && config.sync_user_token))
         create_sync_session();
 }
 
@@ -305,7 +274,7 @@ void RealmCoordinator::send_commit_notifications(Realm& source_realm)
     if (m_sync_session) {
         auto& sg = Realm::Internal::get_shared_group(source_realm);
         auto version = LangBindHelper::get_version_of_latest_snapshot(sg);
-        m_sync_session->session.nonsync_transact_notify(version);
+        m_sync_session->nonsync_transact_notify(version);
     }
 }
 
@@ -692,5 +661,11 @@ void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, Ve
 void RealmCoordinator::wait_for_upload_complete()
 {
     if (m_sync_session)
-        m_sync_session->session.wait_for_upload_complete_or_client_stopped();
+        m_sync_session->wait_for_upload_complete_or_client_stopped();
+}
+
+void RealmCoordinator::refresh_sync_access_token(std::string access_token, util::Optional<std::string> server_url)
+{
+    REALM_ASSERT(m_sync_session);
+    m_sync_session->refresh_sync_access_token(std::move(access_token), std::move(server_url));
 }

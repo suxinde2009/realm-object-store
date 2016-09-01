@@ -156,7 +156,7 @@ void Realm::open_with_config(const Config& config,
             // throw a C++ exception if server_synchronization_mode is
             // inconsistent with the accessed Realm file. This exception
             // probably has to be transmuted to an NSError.
-            bool server_synchronization_mode = bool(config.sync_server_url);
+            bool server_synchronization_mode = bool(config.sync_server_url || config.sync_config);
             if (server_synchronization_mode) {
                 history = realm::sync::make_sync_history(config.path);
             }
@@ -204,16 +204,6 @@ void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
     REALM_ASSERT(!realm.m_group);
     realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version_id));
     realm.add_schema_change_handler();
-}
-
-void Realm::set_sync_log_level(util::Logger::Level level) noexcept
-{
-    RealmCoordinator::set_sync_log_level(level);
-}
-
-void Realm::set_sync_logger_factory(SyncLoggerFactory& factory) noexcept
-{
-    RealmCoordinator::set_sync_logger_factory(factory);
 }
 
 SharedRealm Realm::get_shared_realm(Config config)
@@ -597,6 +587,17 @@ util::Optional<int> Realm::file_format_upgraded_from_version() const
         return upgrade_initial_version;
     }
     return util::none;
+}
+
+bool Realm::refresh_sync_access_token(std::string access_token, StringData path, util::Optional<std::string> sync_url)
+{
+    auto coordinator = realm::_impl::RealmCoordinator::get_existing_coordinator(path);
+    if (coordinator) {
+        coordinator->refresh_sync_access_token(std::move(access_token), std::move(sync_url));
+        return true;
+    } else {
+        return false;
+    }
 }
 
 Realm::HandoverPackage::HandoverPackage(HandoverPackage&&) = default;

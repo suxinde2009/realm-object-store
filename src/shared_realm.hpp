@@ -23,7 +23,6 @@
 #include "util/thread_id.hpp"
 
 #include <realm/util/optional.hpp>
-#include <realm/util/logger.hpp>
 
 #include <memory>
 #include <thread>
@@ -37,6 +36,7 @@ class Realm;
 class Replication;
 class SharedGroup;
 class StringData;
+struct SyncConfig;
 struct VersionID;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
@@ -108,11 +108,6 @@ enum class SchemaMode : uint8_t {
     Manual
 };
 
-class SyncLoggerFactory {
-public:
-    virtual std::unique_ptr<util::Logger> make_logger(util::Logger::Level) = 0;
-};
-
 class Realm : public std::enable_shared_from_this<Realm> {
 public:
     class HandoverPackage;
@@ -161,12 +156,13 @@ public:
         // speeds up tests that don't need notifications.
         bool automatic_change_notifications = true;
 
+        /// A data structure storing data used to configure the Realm for sync support.
+        std::shared_ptr<SyncConfig> sync_config;
+
+        // FIXME: GlobalNotifier should use sync_config instead.
         util::Optional<std::string> sync_server_url;
         util::Optional<std::string> sync_user_token;
     };
-
-    static void set_sync_log_level(util::Logger::Level) noexcept;
-    static void set_sync_logger_factory(SyncLoggerFactory&) noexcept;
 
     // Get a cached Realm or create a new one if no cached copies exists
     // Caching is done by path - mismatches for in_memory, schema mode or
@@ -307,6 +303,11 @@ public:
                                  std::unique_ptr<SharedGroup>& shared_group,
                                  std::unique_ptr<Group>& read_only_group,
                                  Realm* realm);
+
+
+    static bool refresh_sync_access_token(std::string access_token,
+                                          StringData path,
+                                          util::Optional<std::string> sync_url);
 
 private:
     // `enable_shared_from_this` is unsafe with public constructors; use `make_shared_realm` instead
