@@ -123,7 +123,7 @@ GlobalNotifier::~GlobalNotifier()
 void GlobalNotifier::start()
 {
     m_admin.start([this](auto&& realm_id, auto&& realm_name) {
-        register_realm(realm_id, realm_name);
+        this->register_realm(realm_id, realm_name);
     });
     m_work_thread = std::thread([this] { calculate(); });
 }
@@ -195,7 +195,7 @@ void GlobalNotifier::register_realm(std::string const& realm_id, std::string con
     else {
         std::lock_guard<std::mutex> l(m_deliver_queue_mutex);
         auto version = Realm::Internal::get_shared_group(*realm).get_version_of_current_transaction();
-        m_pending_deliveries.push({{}, version, std::move(realm), {}});
+        m_pending_deliveries.push({{}, version, std::move(realm), std::unordered_map<std::string, CollectionChangeSet>()});
         m_signal->notify();
     }
 

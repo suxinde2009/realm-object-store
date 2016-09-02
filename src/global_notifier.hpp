@@ -24,6 +24,7 @@
 
 #include <realm/version_id.hpp>
 
+#include <condition_variable>
 #include <mutex>
 #include <queue>
 #include <unordered_map>
