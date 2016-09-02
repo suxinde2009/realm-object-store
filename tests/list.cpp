@@ -379,6 +379,9 @@ TEST_CASE("list") {
             REQUIRE(lst.get(11).get_index() == 2);
 
 #if REALM_VER_MAJOR >= 2
+            // requires newer than rc2 to work
+            if (strcmp(REALM_VER_EXTRA, "rc2") == 0)
+                return;
             // add a new row with the same primary key
             write([&] {
                 size_t row = origin->add_empty_row(2);
