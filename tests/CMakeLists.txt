@@ -20,6 +20,7 @@ set(SOURCES
     results.cpp
     schema.cpp
     transaction_log_parsing.cpp
+    object_store.cpp
     util/event_loop.cpp
     util/test_file.cpp
 )
