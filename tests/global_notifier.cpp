@@ -47,7 +47,7 @@ TEST_CASE("GlobalNotifier: callback invocation") {
     auto root = util::make_temp_dir();
     _impl::AdminRealmManager admin_manager(root, server.base_url(), s_test_token);
 
-    SyncTestFile config(admin_manager, "id", "name");
+    SyncTestFile config(admin_manager, "id", "/name");
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int, "", "", false, false, false}
@@ -62,7 +62,7 @@ TEST_CASE("GlobalNotifier: callback invocation") {
         bool filter_callback(std::string const& name) override
         {
             ++filter_calls[name];
-            return name == "name";
+            return name == "/name";
         }
 
         void realm_changed(GlobalNotifier::ChangeNotification change) override
@@ -79,34 +79,34 @@ TEST_CASE("GlobalNotifier: callback invocation") {
     SECTION("filter_callback()") {
         SECTION("is called when a new realm is added") {
             REQUIRE(target->filter_calls.empty());
-            admin_manager.create_realm("id", "name");
+            admin_manager.create_realm("id", "/name");
             REQUIRE(target->filter_calls.empty());
             util::run_event_loop_until([&]{ return !target->filter_calls.empty(); });
             REQUIRE(target->filter_calls.size() == 1);
-            REQUIRE(target->filter_calls["name"] == 1);
+            REQUIRE(target->filter_calls["/name"] == 1);
         }
 
         SECTION("is not called multiple times for the same name, regardless of result") {
-            admin_manager.create_realm("id", "name");
+            admin_manager.create_realm("id", "/name");
             util::run_event_loop_until([&]{ return target->filter_calls.size() > 0; });
-            REQUIRE(target->filter_calls["name"] == 1);
+            REQUIRE(target->filter_calls["/name"] == 1);
 
-            admin_manager.create_realm("id2", "name2");
+            admin_manager.create_realm("id2", "/name2");
             util::run_event_loop_until([&]{ return target->filter_calls.size() > 1; });
-            REQUIRE(target->filter_calls["name"] == 1);
-            REQUIRE(target->filter_calls["name2"] == 1);
+            REQUIRE(target->filter_calls["/name"] == 1);
+            REQUIRE(target->filter_calls["/name2"] == 1);
 
-            admin_manager.create_realm("id3", "name3");
+            admin_manager.create_realm("id3", "/name3");
             util::run_event_loop_until([&]{ return target->filter_calls.size() > 2; });
-            REQUIRE(target->filter_calls["name"] == 1);
-            REQUIRE(target->filter_calls["name2"] == 1);
-            REQUIRE(target->filter_calls["name3"] == 1);
+            REQUIRE(target->filter_calls["/name"] == 1);
+            REQUIRE(target->filter_calls["/name2"] == 1);
+            REQUIRE(target->filter_calls["/name3"] == 1);
         }
     }
 
     SECTION("realm_changed()") {
         SECTION("is not called until the schema has been initialized") {
-            admin_manager.create_realm("id", "name");
+            admin_manager.create_realm("id", "/name");
             util::run_event_loop_until([&]{ return !target->filter_calls.empty(); });
             // Run the event loop one more time after the filter call to ensure
             // that it would have delivered if there was anything to deliver
@@ -120,10 +120,10 @@ TEST_CASE("GlobalNotifier: callback invocation") {
         }
 
         SECTION("is not called for realms which were filtered out") {
-            admin_manager.create_realm("id", "name");
-            admin_manager.create_realm("id2", "name2");
+            admin_manager.create_realm("id", "/name");
+            admin_manager.create_realm("id2", "/name2");
 
-            SyncTestFile config2(admin_manager, "id2", "name2");
+            SyncTestFile config2(admin_manager, "id2", "/name2");
             config2.schema = config.schema;
             wait_for_upload(*Realm::get_shared_realm(config2));
             wait_for_upload(*Realm::get_shared_realm(config));
@@ -134,7 +134,7 @@ TEST_CASE("GlobalNotifier: callback invocation") {
         }
 
         SECTION("is called after each change") {
-            admin_manager.create_realm("id", "name");
+            admin_manager.create_realm("id", "/name");
             auto realm = Realm::get_shared_realm(config);
 
             util::run_event_loop_until([&]{ return target->change_calls.size() > 0; });
@@ -154,7 +154,7 @@ TEST_CASE("GlobalNotifier: callback invocation") {
         }
 
         SECTION("is not called while paused") {
-            admin_manager.create_realm("id", "name");
+            admin_manager.create_realm("id", "/name");
             auto realm = Realm::get_shared_realm(config);
 
             util::run_event_loop_until([&]{ return target->change_calls.size() > 0; });
@@ -179,7 +179,7 @@ TEST_CASE("GlobalNotifier: fine-grained") {
     auto root = util::make_temp_dir();
     _impl::AdminRealmManager admin_manager(root, server.base_url(), s_test_token);
 
-    SyncTestFile config(admin_manager, "id", "name");
+    SyncTestFile config(admin_manager, "id", "/name");
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int, "", "", false, false, false}
@@ -209,8 +209,8 @@ TEST_CASE("GlobalNotifier: fine-grained") {
     GlobalNotifier notifier(std::move(unique_target), root, server.base_url(), s_test_token);
 
     SECTION("initial changes are empty if the file already exists") {
-        admin_manager.create_realm("id", "name");
-        auto admin_config = admin_manager.get_config("id", "name");
+        admin_manager.create_realm("id", "/name");
+        auto admin_config = admin_manager.get_config("id", "/name");
         admin_config.schema = config.schema;
         auto realm = Realm::get_shared_realm(admin_config);
         realm->begin_transaction();
@@ -225,7 +225,7 @@ TEST_CASE("GlobalNotifier: fine-grained") {
     }
 
     SECTION("basic modifications") {
-        admin_manager.create_realm("id", "name");
+        admin_manager.create_realm("id", "/name");
         notifier.start();
 
         auto realm = Realm::get_shared_realm(config);
@@ -252,7 +252,7 @@ TEST_CASE("GlobalNotifier: fine-grained") {
     }
 
     SECTION("changes are reported for new tables") {
-        admin_manager.create_realm("id", "name");
+        admin_manager.create_realm("id", "/name");
         notifier.start();
         auto realm = Realm::get_shared_realm(config);
         target->wait_for_change();
@@ -277,7 +277,7 @@ TEST_CASE("GlobalNotifier: fine-grained") {
             }},
         };
 
-        admin_manager.create_realm("id", "name");
+        admin_manager.create_realm("id", "/name");
         notifier.start();
         auto realm = Realm::get_shared_realm(config);
         target->wait_for_change();

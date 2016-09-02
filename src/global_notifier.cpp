@@ -82,7 +82,7 @@ Realm::Config AdminRealmManager::get_config(StringData realm_id, StringData real
 {
     Realm::Config config;
     config.path =  util::File::resolve(std::string(realm_id) + ".realm", m_regular_realms_dir);
-    config.sync_server_url = m_server_base_url + "/" + realm_name.data();
+    config.sync_server_url = m_server_base_url + realm_name.data();
     config.sync_user_token = m_access_token;
     config.schema_mode = SchemaMode::Additive;
     return config;
