@@ -29,8 +29,8 @@ namespace _impl {
 struct SyncClient {
     sync::Client client;
 
-    SyncClient(std::unique_ptr<util::Logger> logger, std::function<sync::Client::ErrorHandler> handler)
-    : client(make_client(*logger)) // Throws
+    SyncClient(std::unique_ptr<util::Logger> logger, std::function<sync::Client::ErrorHandler> handler, bool verify_servers_ssl_certificate)
+    : client(make_client(*logger, verify_servers_ssl_certificate)) // Throws
     , m_logger(std::move(logger))
     , m_thread([this, handler=std::move(handler)] {
         client.set_error_handler(std::move(handler));
@@ -46,10 +46,11 @@ struct SyncClient {
     }
 
 private:
-    static sync::Client make_client(util::Logger& logger)
+    static sync::Client make_client(util::Logger& logger, bool verify_servers_ssl_certificate)
     {
         sync::Client::Config config;
         config.logger = &logger;
+        config.verify_servers_ssl_certificate = verify_servers_ssl_certificate;
         return sync::Client(std::move(config)); // Throws
     }
 

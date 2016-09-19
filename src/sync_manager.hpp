@@ -49,6 +49,7 @@ public:
     void set_logger_factory(SyncLoggerFactory&) noexcept;
     void set_error_handler(std::function<sync::Client::ErrorHandler>);
     void set_login_function(SyncLoginFunction);
+    void set_verify_servers_ssl_certificate(bool value) { m_verify_servers_ssl_certificate = value; };
 
     SyncLoginFunction& get_sync_login_function();
     std::unique_ptr<_impl::SyncSession> create_session(std::string realm_path) const;
@@ -64,6 +65,7 @@ private:
     mutable std::mutex m_mutex;
 
     SyncLoginFunction m_login_function;
+    bool m_verify_servers_ssl_certificate = true;
 
     // FIXME: Should probably be util::Logger::Level::error
     util::Logger::Level m_log_level = util::Logger::Level::info;

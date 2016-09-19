@@ -91,5 +91,5 @@ std::shared_ptr<SyncClient> SyncManager::create_sync_client() const
         stderr_logger->set_level_threshold(m_log_level);
         logger = std::move(stderr_logger);
     }
-    return std::make_shared<SyncClient>(std::move(logger), std::move(m_error_handler));
+    return std::make_shared<SyncClient>(std::move(logger), std::move(m_error_handler), m_verify_servers_ssl_certificate);
 }
