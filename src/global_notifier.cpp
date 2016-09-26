@@ -44,9 +44,9 @@ AdminRealmManager::AdminRealmManager(std::string local_root, std::string server_
 
     Realm::Config config;
     config.cache = false;
-    config.path = util::File::resolve("admin.realm", local_root);
+    config.path = util::File::resolve("__admin.realm", local_root);
     config.schema_mode = SchemaMode::Additive;
-    config.sync_server_url = m_server_base_url + "/admin";
+    config.sync_server_url = m_server_base_url + "/__admin";
     config.sync_user_token = m_access_token;
     config.schema = Schema{
         {"RealmFile", {
