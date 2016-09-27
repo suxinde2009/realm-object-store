@@ -127,7 +127,7 @@ private:
     std::shared_ptr<SyncSession> m_sync_session;
 
     // must be called with m_notifier_mutex locked
-    void pin_version(uint_fast64_t version, uint_fast32_t index);
+    void pin_version(VersionID version);
 
     void set_config(const Realm::Config&);
     void create_sync_session();
