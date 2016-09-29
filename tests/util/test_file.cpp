@@ -25,6 +25,7 @@
 #include "sync_manager.hpp"
 
 #include <realm/disable_sync_to_disk.hpp>
+#include <realm/history.hpp>
 #include <realm/string_data.hpp>
 
 #include <cstdlib>
