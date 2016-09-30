@@ -24,6 +24,10 @@
 
 #include <realm/util/optional.hpp>
 
+#if REALM_ENABLE_SYNC
+#include <realm/sync/client.hpp>
+#endif
+
 #include <memory>
 #include <thread>
 
@@ -158,10 +162,6 @@ public:
 
         /// A data structure storing data used to configure the Realm for sync support.
         std::shared_ptr<SyncConfig> sync_config;
-
-        // FIXME: GlobalNotifier should use sync_config instead.
-        util::Optional<std::string> sync_server_url;
-        util::Optional<std::string> sync_user_token;
     };
 
     // Get a cached Realm or create a new one if no cached copies exists
@@ -303,11 +303,6 @@ public:
                                  std::unique_ptr<SharedGroup>& shared_group,
                                  std::unique_ptr<Group>& read_only_group,
                                  Realm* realm);
-
-
-    static bool refresh_sync_access_token(std::string access_token,
-                                          StringData path,
-                                          util::Optional<std::string> sync_url);
 
 private:
     // `enable_shared_from_this` is unsafe with public constructors; use `make_shared_realm` instead

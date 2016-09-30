@@ -1,6 +1,5 @@
 set(SOURCES
     collection_notifications.cpp
-    global_notifier.cpp
     index_set.cpp
     list.cpp
     object_schema.cpp
@@ -25,7 +24,6 @@ set(SOURCES
 
 set(HEADERS
     collection_notifications.hpp
-    global_notifier.hpp
     index_set.hpp
     list.hpp
     object_schema.hpp
@@ -38,6 +36,7 @@ set(HEADERS
 
     impl/android/external_commit_helper.hpp
     impl/apple/external_commit_helper.hpp
+    impl/apple/keychain_helper.hpp
     impl/generic/external_commit_helper.hpp
 
     impl/collection_change_builder.hpp
@@ -67,7 +66,7 @@ set(HEADERS
 )
 
 if(APPLE)
-    list(APPEND SOURCES impl/apple/external_commit_helper.cpp)
+    list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
 elseif(REALM_PLATFORM STREQUAL "Android")
     list(APPEND SOURCES impl/android/external_commit_helper.cpp)
 else()
@@ -80,11 +79,16 @@ set(INCLUDE_DIRS
     ${UV_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR})
 
-# Add the sync files separately to reduce merge conflicts.
-list(APPEND HEADERS sync_manager.cpp impl/sync_session.cpp)
-list(APPEND SOURCES sync_manager.cpp impl/sync_client.hpp impl/sync_session.hpp)
-find_package(ZLIB REQUIRED)
-list(APPEND INCLUDE_DIRS ${REALM_SYNC_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS})
+if(REALM_ENABLE_SYNC)
+    # Add the sync files separately to reduce merge conflicts.
+    list(APPEND HEADERS sync_config.hpp sync_manager.hpp sync_metadata.hpp sync_session.hpp impl/sync_client.hpp)
+    list(APPEND SOURCES sync_manager.cpp sync_metadata.cpp sync_session.cpp)
+    find_package(ZLIB REQUIRED)
+    list(APPEND INCLUDE_DIRS ${REALM_SYNC_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS})
+
+    list(APPEND HEADERS global_notifier.hpp)
+    list(APPEND SOURCES global_notifier.cpp)
+endif()
 
 add_library(realm-object-store STATIC ${SOURCES} ${HEADERS})
 set_target_properties(realm-object-store PROPERTIES POSITION_INDEPENDENT_CODE 1)
@@ -92,5 +96,7 @@ target_compile_definitions(realm-object-store PRIVATE ${PLATFORM_DEFINES})
 target_include_directories(realm-object-store PUBLIC ${INCLUDE_DIRS})
 target_link_libraries(realm-object-store PUBLIC realm ${PLATFORM_LIBRARIES})
 
-# Add the sync libraries separately to reduce merge conflicts.
-target_link_libraries(realm-object-store PUBLIC realm-sync ${ZLIB_LIBRARIES})
+if(REALM_ENABLE_SYNC)
+    # Add the sync libraries separately to reduce merge conflicts.
+    target_link_libraries(realm-object-store PUBLIC realm-sync ${ZLIB_LIBRARIES})
+endif()

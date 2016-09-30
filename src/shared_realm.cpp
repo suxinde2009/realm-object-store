@@ -31,8 +31,11 @@
 #include "util/format.hpp"
 
 #include <realm/history.hpp>
-#include <realm/sync/history.hpp>
 #include <realm/util/scope_exit.hpp>
+
+#if REALM_ENABLE_SYNC
+#include <realm/sync/history.hpp>
+#endif
 
 using namespace realm;
 using namespace realm::_impl;
@@ -149,14 +152,15 @@ void Realm::open_with_config(const Config& config,
             // throw a C++ exception if server_synchronization_mode is
             // inconsistent with the accessed Realm file. This exception
             // probably has to be transmuted to an NSError.
-            bool server_synchronization_mode = bool(config.sync_server_url || config.sync_config);
+            bool server_synchronization_mode = bool(config.sync_config);
             if (server_synchronization_mode) {
+#if REALM_ENABLE_SYNC
                 history = realm::sync::make_sync_history(config.path);
+#endif
             }
             else {
                 history = realm::make_in_realm_history(config.path);
             }
-
             SharedGroupOptions options;
             options.durability = config.in_memory ? SharedGroupOptions::Durability::MemOnly :
                                                     SharedGroupOptions::Durability::Full;
@@ -581,17 +585,6 @@ util::Optional<int> Realm::file_format_upgraded_from_version() const
         return upgrade_initial_version;
     }
     return util::none;
-}
-
-bool Realm::refresh_sync_access_token(std::string access_token, StringData path, util::Optional<std::string> sync_url)
-{
-    auto coordinator = realm::_impl::RealmCoordinator::get_existing_coordinator(path);
-    if (coordinator) {
-        coordinator->refresh_sync_access_token(std::move(access_token), std::move(sync_url));
-        return true;
-    } else {
-        return false;
-    }
 }
 
 Realm::HandoverPackage::HandoverPackage(HandoverPackage&&) = default;

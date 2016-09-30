@@ -21,11 +21,13 @@
 
 #include "shared_realm.hpp"
 
-#include <realm/sync/client.hpp>
-#include <realm/sync/server.hpp>
-
 #include <realm/group_shared.hpp>
 #include <realm/util/logger.hpp>
+
+#if REALM_ENABLE_SYNC
+#include <realm/sync/client.hpp>
+#include <realm/sync/server.hpp>
+#endif
 
 namespace realm {
 namespace _impl {
@@ -50,11 +52,13 @@ struct InMemoryTestFile : TestFile {
     InMemoryTestFile();
 };
 
+void advance_and_notify(realm::Realm& realm);
+
+#if REALM_ENABLE_SYNC
+
 struct SyncTestFile : TestFile {
     SyncTestFile(realm::_impl::AdminRealmManager& manager, realm::StringData id, realm::StringData name);
 };
-
-void advance_and_notify(realm::Realm& realm);
 
 #define TEST_ENABLE_SYNC_LOGGING 0 // change to 1 to enable logging
 
@@ -80,5 +84,7 @@ private:
     std::thread m_thread;
     std::string m_url;
 };
+
+#endif // REALM_ENABLE_SYNC
 
 #endif
