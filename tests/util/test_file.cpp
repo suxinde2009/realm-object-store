@@ -22,7 +22,9 @@
 #include "util/format.hpp"
 #include "global_notifier.hpp"
 
+#if REALM_ENABLE_SYNC
 #include "sync_manager.hpp"
+#endif
 
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/history.hpp>
@@ -65,12 +67,12 @@ InMemoryTestFile::InMemoryTestFile()
     in_memory = true;
 }
 
+#if REALM_ENABLE_SYNC
+
 SyncTestFile::SyncTestFile(_impl::AdminRealmManager& manager, StringData id, StringData name)
 {
-    auto sync_config = manager.get_config(id, name);
+    sync_config = manager.get_config(id, name).sync_config;
     schema_mode = SchemaMode::Additive;
-    sync_server_url = sync_config.sync_server_url;
-    sync_user_token = sync_config.sync_user_token;
 }
 
 sync::Server::Config TestLogger::server_config() {
@@ -128,6 +130,8 @@ std::string SyncServer::url_for_realm(StringData realm_name) const
 {
     return util::format("%1/%2", m_url, realm_name);
 }
+
+#endif // REALM_ENABLE_SYNC
 
 #if defined(__has_feature) && __has_feature(thread_sanitizer)
 // A helper which synchronously runs on_change() on a fixed background thread

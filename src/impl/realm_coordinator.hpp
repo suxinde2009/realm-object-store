@@ -21,8 +21,6 @@
 
 #include "shared_realm.hpp"
 
-#include <realm/version_id.hpp>
-
 #include <mutex>
 
 namespace realm {
@@ -30,12 +28,12 @@ class Replication;
 class Schema;
 class SharedGroup;
 class StringData;
+struct SyncSession;
 
 namespace _impl {
 class CollectionNotifier;
 class ExternalCommitHelper;
 class WeakRealmNotifier;
-struct SyncSession;
 
 // RealmCoordinator manages the weak cache of Realm instances and communication
 // between per-thread Realm instances for a given file
@@ -97,11 +95,7 @@ public:
 
     void notify_others();
 
-    void set_transaction_callback(std::function<void(VersionID, VersionID)> fn);
-    void wait_for_upload_complete();
-
-    // FIXME: Consider whether this function should live here
-    void refresh_sync_access_token(std::string access_token, util::Optional<std::string> server_url);
+    void set_transaction_callback(std::function<void(VersionID, VersionID)>);
 
 private:
     Realm::Config m_config;
@@ -130,13 +124,14 @@ private:
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
     std::function<void(VersionID, VersionID)> m_transaction_callback;
 
-    std::unique_ptr<SyncSession> m_sync_session;
+    std::shared_ptr<SyncSession> m_sync_session;
 
     // must be called with m_notifier_mutex locked
     void pin_version(uint_fast64_t version, uint_fast32_t index);
 
     void set_config(const Realm::Config&);
     void create_sync_session();
+
     void run_async_notifiers();
     void open_helper_shared_group();
     void advance_helper_shared_group_to_latest();

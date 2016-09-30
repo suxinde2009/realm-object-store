@@ -175,6 +175,7 @@ function(build_realm_sync sync_directory)
         find_library(SECURITY Security)
     endif()
     ExternalProject_Add(realm-sync-lib
+        DEPENDS realm-core
         URL ""
         PREFIX ${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync
         SOURCE_DIR ${sync_directory}
@@ -192,9 +193,9 @@ function(build_realm_sync sync_directory)
     ExternalProject_Add_Step(realm-sync-lib ensure-libraries
         COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${sync_libraries}
         OUTPUT ${sync_libraries}
-        DEPENDS realm
         DEPENDEES build
         )
+
     add_library(realm-sync STATIC IMPORTED)
     add_dependencies(realm-sync realm-sync-lib)
 
@@ -210,6 +211,7 @@ function(build_realm_sync sync_directory)
 
     # Sync server library is built as part of the sync library build
     ExternalProject_Add(realm-server-lib
+        DEPENDS realm-core
         DOWNLOAD_COMMAND ""
         PREFIX ${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync
         SOURCE_DIR ${sync_directory}
@@ -224,7 +226,6 @@ function(build_realm_sync sync_directory)
     ExternalProject_Add_Step(realm-server-lib ensure-server-libraries
         COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${sync_server_libraries}
         OUTPUT ${sync_server_libraries}
-        DEPENDS realm
         DEPENDEES build
         )
 

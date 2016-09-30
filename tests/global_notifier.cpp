@@ -28,6 +28,9 @@
 #include "object_store.hpp"
 #include "property.hpp"
 #include "schema.hpp"
+#include "sync_config.hpp"
+#include "sync_manager.hpp"
+#include "sync_session.hpp"
 
 #include <realm/group_shared.hpp>
 
@@ -36,13 +39,35 @@ using namespace realm;
 // {"identity":"test", "access": ["download", "upload"]}
 static const std::string s_test_token = "eyJpZGVudGl0eSI6InRlc3QiLCAiYWNjZXNzIjogWyJkb3dubG9hZCIsICJ1cGxvYWQiXX0=";
 
+static void login(const std::string& path, const SyncConfig& config)
+{
+    auto thread = std::thread([path, config]{
+        auto session = SyncManager::shared().get_existing_active_session(path);
+        session->refresh_access_token(s_test_token, config.realm_url);
+    });
+    thread.detach();
+}
+
 static void wait_for_upload(Realm& realm)
 {
-    _impl::RealmCoordinator::get_existing_coordinator(realm.config().path)->wait_for_upload_complete();
+    std::condition_variable cv;
+    std::mutex mutex;
+    bool done = false;
+
+    auto session = SyncManager::shared().get_existing_active_session(realm.config().path);
+    session->wait_for_upload_completion([&] {
+        done = true;
+        cv.notify_one();
+    });
+
+    std::unique_lock<std::mutex> lock(mutex);
+    cv.wait(lock, [&] { return done; });
 }
 
 TEST_CASE("GlobalNotifier: callback invocation") {
     SyncServer server;
+
+    SyncManager::shared().set_login_function(&login);
 
     auto root = util::make_temp_dir();
     _impl::AdminRealmManager admin_manager(root, server.base_url(), s_test_token);
@@ -67,7 +92,7 @@ TEST_CASE("GlobalNotifier: callback invocation") {
 
         void realm_changed(GlobalNotifier::ChangeNotification change) override
         {
-            ++change_calls[*change.get_new_realm()->config().sync_server_url];
+            ++change_calls[change.get_new_realm()->config().sync_config->realm_url];
         }
     };
     auto unique_target = std::make_unique<Target>();
@@ -116,7 +141,7 @@ TEST_CASE("GlobalNotifier: callback invocation") {
 
             wait_for_upload(*Realm::get_shared_realm(config));
             util::run_event_loop_until([&]{ return target->change_calls.size() > 0; });
-            REQUIRE(target->change_calls[*config.sync_server_url] == 1);
+            REQUIRE(target->change_calls[config.sync_config->realm_url] == 1);
         }
 
         SECTION("is not called for realms which were filtered out") {
@@ -129,8 +154,8 @@ TEST_CASE("GlobalNotifier: callback invocation") {
             wait_for_upload(*Realm::get_shared_realm(config));
 
             util::run_event_loop_until([&]{ return target->change_calls.size() > 0; });
-            REQUIRE(target->change_calls[*config.sync_server_url] == 1);
-            REQUIRE(target->change_calls[*config2.sync_server_url] == 0);
+            REQUIRE(target->change_calls[config.sync_config->realm_url] == 1);
+            REQUIRE(target->change_calls[config2.sync_config->realm_url] == 0);
         }
 
         SECTION("is called after each change") {
@@ -138,19 +163,19 @@ TEST_CASE("GlobalNotifier: callback invocation") {
             auto realm = Realm::get_shared_realm(config);
 
             util::run_event_loop_until([&]{ return target->change_calls.size() > 0; });
-            REQUIRE(target->change_calls[*config.sync_server_url] == 1);
+            REQUIRE(target->change_calls[config.sync_config->realm_url] == 1);
 
             realm->begin_transaction();
             realm->read_group().get_table("class_object")->add_empty_row();
             realm->commit_transaction();
-            util::run_event_loop_until([&] { return target->change_calls[*config.sync_server_url] > 1; });
-            REQUIRE(target->change_calls[*config.sync_server_url] == 2);
+            util::run_event_loop_until([&] { return target->change_calls[config.sync_config->realm_url] > 1; });
+            REQUIRE(target->change_calls[config.sync_config->realm_url] == 2);
 
             realm->begin_transaction();
             realm->read_group().get_table("class_object")->add_empty_row();
             realm->commit_transaction();
-            util::run_event_loop_until([&] { return target->change_calls[*config.sync_server_url] > 2; });
-            REQUIRE(target->change_calls[*config.sync_server_url] == 3);
+            util::run_event_loop_until([&] { return target->change_calls[config.sync_config->realm_url] > 2; });
+            REQUIRE(target->change_calls[config.sync_config->realm_url] == 3);
         }
 
         SECTION("is not called while paused") {
@@ -158,23 +183,25 @@ TEST_CASE("GlobalNotifier: callback invocation") {
             auto realm = Realm::get_shared_realm(config);
 
             util::run_event_loop_until([&]{ return target->change_calls.size() > 0; });
-            REQUIRE(target->change_calls[*config.sync_server_url] == 1);
+            REQUIRE(target->change_calls[config.sync_config->realm_url] == 1);
 
             realm->begin_transaction();
             realm->read_group().get_table("class_object")->add_empty_row();
             realm->commit_transaction();
             notifier.pause();
             util::run_event_loop_until([&] { return notifier.has_pending(); });
-            REQUIRE(target->change_calls[*config.sync_server_url] == 1);
+            REQUIRE(target->change_calls[config.sync_config->realm_url] == 1);
 
             notifier.resume();
-            REQUIRE(target->change_calls[*config.sync_server_url] == 2);
+            REQUIRE(target->change_calls[config.sync_config->realm_url] == 2);
         }
     }
 }
 
 TEST_CASE("GlobalNotifier: fine-grained") {
     SyncServer server;
+
+    SyncManager::shared().set_login_function(&login);
 
     auto root = util::make_temp_dir();
     _impl::AdminRealmManager admin_manager(root, server.base_url(), s_test_token);

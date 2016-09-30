@@ -37,7 +37,7 @@ namespace util {
 namespace _impl {
 class AdminRealmManager {
 public:
-    AdminRealmManager(std::string local_root, std::string server_base_url, std::string access_token);
+    AdminRealmManager(std::string local_root, std::string server_base_url, std::string user_tag);
     void start(std::function<void(std::string, std::string)> new_realm_callback);
     Realm::Config get_config(StringData realm_id, StringData realm_name);
     void create_realm(StringData realm_id, StringData realm_name);
@@ -45,7 +45,7 @@ public:
 private:
     const std::string m_regular_realms_dir;
     const std::string m_server_base_url;
-    const std::string m_access_token;
+    const std::string m_user_tag;
     SharedRealm m_realm;
     Results m_results;
     NotificationToken m_notification_token;

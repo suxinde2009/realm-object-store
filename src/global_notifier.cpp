@@ -25,6 +25,9 @@
 #include "object_schema.hpp"
 #include "util/event_loop_signal.hpp"
 
+#include "sync_config.hpp"
+#include "sync_manager.hpp"
+
 #include <realm/util/file.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/lang_bind_helper.hpp>
@@ -35,10 +38,10 @@
 using namespace realm;
 using namespace realm::_impl;
 
-AdminRealmManager::AdminRealmManager(std::string local_root, std::string server_base_url, std::string access_token)
+AdminRealmManager::AdminRealmManager(std::string local_root, std::string server_base_url, std::string user_tag)
 : m_regular_realms_dir(util::File::resolve("realms", local_root)) // Throws
 , m_server_base_url(std::move(server_base_url))
-, m_access_token(std::move(access_token))
+, m_user_tag(std::move(user_tag))
 {
     util::try_make_dir(m_regular_realms_dir); // Throws
 
@@ -46,8 +49,8 @@ AdminRealmManager::AdminRealmManager(std::string local_root, std::string server_
     config.cache = false;
     config.path = util::File::resolve("__admin.realm", local_root);
     config.schema_mode = SchemaMode::Additive;
-    config.sync_server_url = m_server_base_url + "/__admin";
-    config.sync_user_token = m_access_token;
+    config.sync_config = std::shared_ptr<SyncConfig>(new SyncConfig(m_user_tag, m_server_base_url + "/__admin",
+                                                                    {}, SyncSessionStopPolicy::AfterChangesUploaded));
     config.schema = Schema{
         {"RealmFile", {
             {"id", PropertyType::String, "", "", true, true, false},
@@ -82,8 +85,8 @@ Realm::Config AdminRealmManager::get_config(StringData realm_id, StringData real
 {
     Realm::Config config;
     config.path =  util::File::resolve(std::string(realm_id) + ".realm", m_regular_realms_dir);
-    config.sync_server_url = m_server_base_url + realm_name.data();
-    config.sync_user_token = m_access_token;
+    config.sync_config = std::shared_ptr<SyncConfig>(new SyncConfig(m_user_tag, m_server_base_url + realm_name.data(),
+                                                                    {}, SyncSessionStopPolicy::AfterChangesUploaded));
     config.schema_mode = SchemaMode::Additive;
     return config;
 }

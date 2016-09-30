@@ -26,8 +26,11 @@
 #include "object_store.hpp"
 #include "schema.hpp"
 
-#include "impl/sync_session.hpp"
+#if REALM_ENABLE_SYNC
+#include "sync_config.hpp"
 #include "sync_manager.hpp"
+#include "sync_session.hpp"
+#endif
 
 #include <realm/group_shared.hpp>
 #include <realm/lang_bind_helper.hpp>
@@ -39,15 +42,8 @@
 using namespace realm;
 using namespace realm::_impl;
 
-namespace {
-
-std::mutex s_coordinator_mutex;
-
-// Protected by s_coordinator_mutex
-std::unordered_map<std::string, std::weak_ptr<RealmCoordinator>> s_coordinators_per_path;
-
-} // unnamed namespace
-
+static std::mutex s_coordinator_mutex;
+static std::unordered_map<std::string, std::weak_ptr<RealmCoordinator>> s_coordinators_per_path;
 
 std::shared_ptr<RealmCoordinator> RealmCoordinator::get_coordinator(StringData path)
 {
@@ -80,28 +76,25 @@ std::shared_ptr<RealmCoordinator> RealmCoordinator::get_existing_coordinator(Str
 
 void RealmCoordinator::create_sync_session()
 {
+#if REALM_ENABLE_SYNC
     if (m_sync_session)
         return;
 
-    m_sync_session = SyncManager::shared().create_session(m_config.path); // Throws
+    m_sync_session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
-    m_sync_session->set_sync_transact_callback([weak_self](VersionID old_version, VersionID new_version) {
+    SyncSession::Internal::set_sync_transact_callback(*m_sync_session,
+                                                      [weak_self](VersionID old_version, VersionID new_version) {
         if (auto self = weak_self.lock()) {
             if (self->m_transaction_callback)
                 self->m_transaction_callback(old_version, new_version);
             self->notify_others();
         }
     });
-
-    if (m_config.sync_config) {
-        // Request the binding to bind the Realm at the earliest opportunity (immediately, or upon login).
-        SyncManager::shared().get_sync_login_function()(m_config);
+    if (m_config.sync_config->error_handler) {
+        SyncSession::Internal::set_error_handler(*m_sync_session, m_config.sync_config->error_handler);
     }
-    else {
-        // FIXME: GlobalNotifier should use the same authentication flow as the binding.
-        m_sync_session->refresh_sync_access_token(*m_config.sync_user_token, m_config.sync_server_url);
-    }
+#endif
 }
 
 void RealmCoordinator::set_config(const Realm::Config& config)
@@ -125,22 +118,32 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         if (m_config.schema_version != config.schema_version && config.schema_version != ObjectStore::NotVersioned) {
             throw MismatchedConfigException("Realm at path '%1' already opened with different schema version.", config.path);
         }
-        if (m_config.sync_user_token != config.sync_user_token) {
-            throw MismatchedConfigException("Realm at path '%1' already opened with different user token.", config.path);
+
+        if (bool(m_config.sync_config) != bool(config.sync_config)) {
+            throw MismatchedConfigException("Realm at path '%1' already opened with different sync configurations.", config.path);
         }
-        if (m_config.sync_server_url != config.sync_server_url) {
-            throw MismatchedConfigException("Realm at path '%1' already opened with different server url.", config.path);
+
+        if (config.sync_config) {
+            if (m_config.sync_config->user_tag != config.sync_config->user_tag) {
+                throw MismatchedConfigException("Realm at path '%1' already opened with different sync user identifier.", config.path);
+            }
+            if (m_config.sync_config->realm_url != config.sync_config->realm_url) {
+                throw MismatchedConfigException("Realm at path '%1' already opened with different sync server URL.", config.path);
+            }
         }
+
         // Realm::update_schema() handles complaining about schema mismatches
     }
 
-    if (config.sync_config || (config.sync_server_url && config.sync_user_token))
+    if (config.sync_config) {
         create_sync_session();
+    }
 }
 
 std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
 {
     std::lock_guard<std::mutex> lock(m_realm_mutex);
+
     set_config(config);
 
     if (config.cache) {
@@ -271,11 +274,16 @@ void RealmCoordinator::send_commit_notifications(Realm& source_realm)
     if (m_notifier) {
         m_notifier->notify_others();
     }
+#if REALM_ENABLE_SYNC
     if (m_sync_session) {
         auto& sg = Realm::Internal::get_shared_group(source_realm);
         auto version = LangBindHelper::get_version_of_latest_snapshot(sg);
-        m_sync_session->nonsync_transact_notify(version);
+        SyncSession::Internal::nonsync_transact_notify(*m_sync_session, version);
     }
+#else
+    // Silence "unused parameter 'source_realm'" warning
+    (void)source_realm;
+#endif
 }
 
 void RealmCoordinator::pin_version(uint_fast64_t version, uint_fast32_t index)
@@ -410,11 +418,10 @@ public:
     {
         if (version != m_sg.get_version_of_current_transaction()) {
             transaction::advance(m_sg, *m_current, version);
-            TransactionChangeInfo current;
-            current.table_modifications_needed = m_current->table_modifications_needed;
-            current.table_moves_needed = m_current->table_moves_needed;
-            current.lists = std::move(m_current->lists);
-            m_info.push_back(std::move(current));
+            m_info.push_back({
+                m_current->table_modifications_needed,
+                m_current->table_moves_needed,
+                std::move(m_current->lists)});
             m_current = &m_info.back();
             return true;
         }
@@ -657,16 +664,4 @@ void RealmCoordinator::notify_others()
 void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, VersionID)> fn)
 {
     m_transaction_callback = std::move(fn);
-}
-
-void RealmCoordinator::wait_for_upload_complete()
-{
-    if (m_sync_session)
-        m_sync_session->wait_for_upload_complete_or_client_stopped();
-}
-
-void RealmCoordinator::refresh_sync_access_token(std::string access_token, util::Optional<std::string> server_url)
-{
-    REALM_ASSERT(m_sync_session);
-    m_sync_session->refresh_sync_access_token(std::move(access_token), std::move(server_url));
 }
