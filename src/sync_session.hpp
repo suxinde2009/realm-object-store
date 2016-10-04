@@ -50,7 +50,7 @@ class Session;
 
 using SyncSessionTransactCallback = void(VersionID old_version, VersionID new_version);
 
-struct SyncSession : public std::enable_shared_from_this<struct SyncSession> {
+struct SyncSession : public std::enable_shared_from_this<SyncSession> {
     bool is_valid() const;
 
     std::string const& path() const { return m_realm_path; }
