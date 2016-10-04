@@ -25,6 +25,7 @@
 #include "sync_config.hpp"
 
 #include <mutex>
+#include <memory>
 
 namespace realm {
 
@@ -49,7 +50,7 @@ class Session;
 
 using SyncSessionTransactCallback = void(VersionID old_version, VersionID new_version);
 
-struct SyncSession : public std::enable_shared_from_this<SyncSession> {
+struct SyncSession : public std::enable_shared_from_this<struct SyncSession> {
     bool is_valid() const;
 
     std::string const& path() const { return m_realm_path; }
