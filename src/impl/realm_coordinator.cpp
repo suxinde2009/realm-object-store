@@ -123,6 +123,7 @@ void RealmCoordinator::set_config(const Realm::Config& config)
             throw MismatchedConfigException("Realm at path '%1' already opened with different sync configurations.", config.path);
         }
 
+#if REALM_ENABLE_SYNC
         if (config.sync_config) {
             if (m_config.sync_config->user_tag != config.sync_config->user_tag) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different sync user identifier.", config.path);
@@ -131,6 +132,7 @@ void RealmCoordinator::set_config(const Realm::Config& config)
                 throw MismatchedConfigException("Realm at path '%1' already opened with different sync server URL.", config.path);
             }
         }
+#endif
 
         // Realm::update_schema() handles complaining about schema mismatches
     }
