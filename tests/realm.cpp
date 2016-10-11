@@ -17,7 +17,6 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "catch.hpp"
-
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 
@@ -28,8 +27,7 @@
 #include "schema.hpp"
 
 #include <realm/group.hpp>
-
-#include <unistd.h>
+#include <realm/util/file.hpp>
 
 using namespace realm;
 

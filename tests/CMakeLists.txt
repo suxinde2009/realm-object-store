@@ -8,7 +8,6 @@ set(HEADERS
 
 set(SOURCES
     collection_change_indices.cpp
-    global_notifier.cpp
     handover.cpp
     index_set.cpp
     list.cpp
@@ -28,7 +27,6 @@ set(SOURCES
 add_executable(tests ${SOURCES} ${HEADERS})
 target_compile_definitions(tests PRIVATE ${PLATFORM_DEFINES})
 target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
-target_link_libraries(tests realm-sync realm-sync-server)
 
 create_coverage_target(generate-coverage tests)
 
