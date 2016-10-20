@@ -39,6 +39,10 @@ if(REALM_ENABLE_SYNC)
     target_link_libraries(tests realm-sync-server)
 endif()
 
+if(REALM_ENABLE_SYNC)
+    target_link_libraries(tests realm-sync-server)
+endif()
+
 create_coverage_target(generate-coverage tests)
 
 add_custom_target(run-tests USES_TERMINAL DEPENDS tests COMMAND ./tests)

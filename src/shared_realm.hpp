@@ -25,10 +25,6 @@
 #include <realm/util/optional.hpp>
 #include <realm/version_id.hpp>
 
-#if REALM_ENABLE_SYNC
-#include <realm/sync/client.hpp>
-#endif
-
 #include <memory>
 #include <thread>
 
