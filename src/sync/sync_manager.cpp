@@ -185,21 +185,14 @@ util::Logger::Level SyncManager::log_level() const noexcept
     return m_log_level;
 }
 
-const SyncFileManager& SyncManager::file_manager() const noexcept
-{
-    std::lock_guard<std::mutex> lock(m_file_system_mutex);
-    REALM_ASSERT(m_file_manager);
-    return *m_file_manager;
-}
-
-util::Optional<SyncMetadataManager&> SyncManager::metadata_manager() const
+bool SyncManager::perform_metadata_update(std::function<void(const SyncMetadataManager&)> update_function) const
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     if (!m_metadata_manager) {
-        return none;
+        return false;
     }
-    SyncMetadataManager& m = *m_metadata_manager;
-    return m;
+    update_function(*m_metadata_manager);
+    return true;
 }
 
 std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& identity,
@@ -212,7 +205,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& identity,
     if (it == m_users.end()) {
         // No existing user.
         auto new_user = std::make_shared<SyncUser>(std::move(refresh_token), identity, auth_server_url, is_admin);
-        m_users.insert({ std::move(identity), std::move(new_user) });
+        m_users.insert({ identity, new_user });
         return new_user;
     } else {
         auto user = it->second;
@@ -302,6 +295,7 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
         return session;
     }
 
+    REALM_ASSERT(sync_config.user);
     std::unique_ptr<SyncSession> session = get_existing_inactive_session_locked(path);
     bool session_is_new = false;
     if (!session) {

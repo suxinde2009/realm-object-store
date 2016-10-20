@@ -28,17 +28,18 @@ SyncUser::SyncUser(std::string refresh_token,
                    std::string identity,
                    util::Optional<std::string> server_url,
                    bool is_admin)
-: m_server_url(server_url.value_or(""))
-, m_state(State::Active)
+: m_state(State::Active)
+, m_server_url(server_url.value_or(""))
 , m_is_admin(is_admin)
-, m_refresh_token(std::move(refresh_token))
-, m_identity(std::move(identity))
+, m_refresh_token(refresh_token)
+, m_identity(identity)
 {
-    if (auto manager = SyncManager::shared().metadata_manager()) {
-        // Update persistent user metadata.
-        auto metadata = SyncUserMetadata(*manager, m_identity);
-        metadata.set_state(server_url, m_refresh_token);
-    }
+    SyncManager::shared().perform_metadata_update([refresh_token=std::move(refresh_token),
+                                                   identity=std::move(identity),
+                                                   server_url=std::move(server_url)](const auto& manager) {
+        auto metadata = SyncUserMetadata(manager, identity);
+        metadata.set_state(server_url, refresh_token);
+    });
 }
 
 std::vector<std::shared_ptr<SyncSession>> SyncUser::all_sessions()
@@ -105,11 +106,11 @@ void SyncUser::update_refresh_token(std::string token)
                 break;
             }
         }
-        if (auto manager = SyncManager::shared().metadata_manager()) {
-            // Update persistent user metadata.
-            auto metadata = SyncUserMetadata(*manager, m_identity);
+        // Update persistent user metadata.
+        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+            auto metadata = SyncUserMetadata(manager, m_identity);
             metadata.set_state(m_server_url, token);
-        }
+        });
     }
     // (Re)activate all pending sessions.
     // Note that we do this after releasing the lock, since the session may
@@ -139,11 +140,11 @@ void SyncUser::log_out()
         }
     }
     m_sessions.clear();
-    if (auto manager = SyncManager::shared().metadata_manager()) {
-        // Mark the user as 'dead' in the persisted metadata Realm.
-        auto metadata = SyncUserMetadata(*manager, m_identity, false);
+    // Mark the user as 'dead' in the persisted metadata Realm.
+    SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+        auto metadata = SyncUserMetadata(manager, m_identity, false);
         metadata.mark_for_removal();
-    }
+    });
 }
 
 void SyncUser::invalidate()

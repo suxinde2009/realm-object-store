@@ -131,7 +131,7 @@ SyncUserMetadata::SyncUserMetadata(Schema schema, SharedRealm realm, RowExpr row
 , m_row(row)
 { }
 
-SyncUserMetadata::SyncUserMetadata(SyncMetadataManager& manager, std::string identity, bool make_if_absent)
+SyncUserMetadata::SyncUserMetadata(const SyncMetadataManager& manager, std::string identity, bool make_if_absent)
 : m_schema(manager.m_schema)
 {
     // Open the Realm.

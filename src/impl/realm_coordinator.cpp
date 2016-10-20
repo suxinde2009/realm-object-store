@@ -136,9 +136,11 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         // Realm::update_schema() handles complaining about schema mismatches
     }
 
+#if REALM_ENABLE_SYNC
     if (config.sync_config) {
         create_sync_session();
     }
+#endif
 }
 
 std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)

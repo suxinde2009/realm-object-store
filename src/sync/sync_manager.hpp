@@ -81,13 +81,12 @@ public:
     bool client_should_validate_ssl() const noexcept;
 
     util::Logger::Level log_level() const noexcept;
-    const SyncFileManager& file_manager() const noexcept;
 
     std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config);
     std::shared_ptr<SyncSession> get_existing_active_session(const std::string& path) const;
 
-    // Return a reference to the metadata manager, if one is being used..
-    util::Optional<SyncMetadataManager&> metadata_manager() const;
+    // If the metadata manager is configured, perform an update. Returns `true` iff the code was run.
+    bool perform_metadata_update(std::function<void(const SyncMetadataManager&)> update_function) const;
 
     // Get a sync user for a given identity, or create one if none exists yet, and set its token.
     // If a logged-out user exists, it will marked as logged back in.
