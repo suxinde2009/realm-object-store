@@ -29,6 +29,12 @@
 using namespace realm;
 using namespace realm::_impl;
 
+struct SyncManager::UserCreationData {
+    std::string identity;
+    std::string user_token;
+    util::Optional<std::string> server_url;
+};
+
 SyncManager& SyncManager::shared()
 {
     static SyncManager& manager = *new SyncManager;
@@ -39,62 +45,77 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
                                         MetadataMode metadata_mode,
                                         util::Optional<std::vector<char>> custom_encryption_key)
 {
-    std::vector<std::tuple<std::string, std::shared_ptr<SyncUser>>> users_to_add;
-    REALM_ASSERT(!m_file_manager && !m_metadata_manager);   // Can only call this once
-    m_file_manager = std::make_unique<SyncFileManager>(base_file_path);
-    switch (metadata_mode) {
-        case MetadataMode::NoEncryption:
-            m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
-                                                                       false);
-            break;
-        case MetadataMode::Encryption:
-            m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
-                                                                       true,
-                                                                       std::move(custom_encryption_key));
-            break;
-        case MetadataMode::NoMetadata:
-            return;
-    }
+    std::vector<UserCreationData> users_to_add;
+    {
+        std::lock_guard<std::mutex> lock(m_file_system_mutex);
 
-    REALM_ASSERT(m_metadata_manager);
-    // Load persisted users into the users map.
-    SyncUserMetadataResults users = m_metadata_manager->all_unmarked_users();
-    for (size_t i = 0; i < users.size(); i++) {
-        // Note that 'admin' style users are not persisted.
-        auto user_data = users.get(i);
-        auto user_token = user_data.user_token();
-        auto identity = user_data.identity();
-        if (user_token) {
-            users_to_add.emplace_back(std::make_tuple(identity,
-                                                      std::make_shared<SyncUser>(*user_token,
-                                                                                 std::move(identity),
-                                                                                 false)));
+        // Set up the file manager.
+        if (m_file_manager) {
+            REALM_ASSERT(m_file_manager->base_path() == base_file_path);
+        } else {
+            m_file_manager = std::make_unique<SyncFileManager>(base_file_path);
         }
-    }
-    // Delete any users marked for death.
-    std::vector<SyncUserMetadata> dead_users;
-    SyncUserMetadataResults users_to_remove = m_metadata_manager->all_users_marked_for_removal();
-    dead_users.reserve(users_to_remove.size());
-    for (size_t i = 0; i < users_to_remove.size(); i++) {
-        auto user = users_to_remove.get(i);
-        // FIXME: delete user data in a different way? (This deletes a logged-out user's data as soon as the app
-        // launches again, which might not be how some apps want to treat their data.)
-        m_file_manager->remove_user_directory(user.identity());
-        dead_users.emplace_back(std::move(user));
-    }
-    for (auto& user : dead_users) {
-        user.remove();
+
+        // Set up the metadata manager, and perform initial loading/purging work.
+        if (m_metadata_manager) {
+            return;
+        }
+        switch (metadata_mode) {
+            case MetadataMode::NoEncryption:
+                m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
+                                                                           false);
+                break;
+            case MetadataMode::Encryption:
+                m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
+                                                                           true,
+                                                                           std::move(custom_encryption_key));
+                break;
+            case MetadataMode::NoMetadata:
+                return;
+        }
+
+        REALM_ASSERT(m_metadata_manager);
+        // Load persisted users into the users map.
+        SyncUserMetadataResults users = m_metadata_manager->all_unmarked_users();
+        for (size_t i = 0; i < users.size(); i++) {
+            // Note that 'admin' style users are not persisted.
+            auto user_data = users.get(i);
+            auto user_token = user_data.user_token();
+            auto identity = user_data.identity();
+            auto server_url = user_data.server_url();
+            if (user_token) {
+                UserCreationData data = { std::move(identity), std::move(*user_token), std::move(server_url) };
+                users_to_add.emplace_back(std::move(data));
+            }
+        }
+        // Delete any users marked for death.
+        std::vector<SyncUserMetadata> dead_users;
+        SyncUserMetadataResults users_to_remove = m_metadata_manager->all_users_marked_for_removal();
+        dead_users.reserve(users_to_remove.size());
+        for (size_t i = 0; i < users_to_remove.size(); i++) {
+            auto user = users_to_remove.get(i);
+            // FIXME: delete user data in a different way? (This deletes a logged-out user's data as soon as the app
+            // launches again, which might not be how some apps want to treat their data.)
+            m_file_manager->remove_user_directory(user.identity());
+            dead_users.emplace_back(std::move(user));
+        }
+        for (auto& user : dead_users) {
+            user.remove();
+        }
     }
     {
         std::lock_guard<std::mutex> lock(m_user_mutex);
-        for (auto& tuple : users_to_add) {
-            m_users.insert({ std::move(std::get<0>(tuple)), std::move(std::get<1>(tuple)) });
+        for (auto& user_data : users_to_add) {
+            m_users.insert({ user_data.identity, std::make_shared<SyncUser>(std::move(user_data.user_token),
+                                                                            std::move(user_data.identity),
+                                                                            std::move(user_data.server_url)) });
         }
     }
 }
 
 void SyncManager::reset_for_testing()
 {
+    std::lock_guard<std::mutex> lock(m_file_system_mutex);
     m_file_manager = nullptr;
     m_metadata_manager = nullptr;
     {
@@ -166,12 +187,14 @@ util::Logger::Level SyncManager::log_level() const noexcept
 
 const SyncFileManager& SyncManager::file_manager() const noexcept
 {
+    std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
     return *m_file_manager;
 }
 
 util::Optional<SyncMetadataManager&> SyncManager::metadata_manager() const
 {
+    std::lock_guard<std::mutex> lock(m_file_system_mutex);
     if (!m_metadata_manager) {
         return none;
     }
@@ -179,17 +202,23 @@ util::Optional<SyncMetadataManager&> SyncManager::metadata_manager() const
     return m;
 }
 
-std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& identity, std::string refresh_token, bool is_admin)
+std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& identity,
+                                                std::string refresh_token,
+                                                util::Optional<std::string> auth_server_url,
+                                                bool is_admin)
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
     auto it = m_users.find(identity);
     if (it == m_users.end()) {
         // No existing user.
-        auto new_user = std::make_shared<SyncUser>(std::move(refresh_token), identity, is_admin);
-        m_users.insert({ identity, new_user });
+        auto new_user = std::make_shared<SyncUser>(std::move(refresh_token), identity, auth_server_url, is_admin);
+        m_users.insert({ std::move(identity), std::move(new_user) });
         return new_user;
     } else {
         auto user = it->second;
+        if (auth_server_url && *auth_server_url != user->server_url()) {
+            throw std::invalid_argument("Cannot retrieve an existing user specifying a different auth server.");
+        }
         if (is_admin != user->is_admin()) {
             throw std::invalid_argument("Cannot retrieve an existing user with a different admin status.");
         }
@@ -228,6 +257,7 @@ std::vector<std::shared_ptr<SyncUser>> SyncManager::all_users() const
 
 std::string SyncManager::path_for_realm(const std::string& user_identity, const std::string& raw_realm_url) const
 {
+    std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
     return m_file_manager->path(user_identity, raw_realm_url);
 }
