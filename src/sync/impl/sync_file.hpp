@@ -70,6 +70,10 @@ public:
     /// Remove the metadata Realm.
     bool remove_metadata_realm();
 
+    const std::string& base_path() const {
+        return m_base_path;
+    }
+
 private:
     std::string m_base_path;
 

@@ -120,6 +120,7 @@ private:
     std::unique_ptr<SyncSession> get_existing_inactive_session_locked(const std::string& path);
 
     mutable std::mutex m_mutex;
+    mutable std::mutex m_configure_file_system_mutex;
 
     // FIXME: Should probably be util::Logger::Level::error
     util::Logger::Level m_log_level = util::Logger::Level::info;
