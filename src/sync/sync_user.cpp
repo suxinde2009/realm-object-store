@@ -24,12 +24,22 @@
 
 namespace realm {
 
-SyncUser::SyncUser(std::string refresh_token, std::string identity, bool is_admin)
-: m_state(State::Active)
+SyncUser::SyncUser(std::string refresh_token,
+                   std::string identity,
+                   util::Optional<std::string> server_url,
+                   bool is_admin)
+: m_server_url(server_url.value_or(""))
+, m_state(State::Active)
 , m_is_admin(is_admin)
 , m_refresh_token(std::move(refresh_token))
 , m_identity(std::move(identity))
-{ }
+{
+    if (auto manager = SyncManager::shared().metadata_manager()) {
+        // Update persistent user metadata.
+        auto metadata = SyncUserMetadata(*manager, m_identity);
+        metadata.set_state(server_url, m_refresh_token);
+    }
+}
 
 std::vector<std::shared_ptr<SyncSession>> SyncUser::all_sessions()
 {
@@ -98,7 +108,7 @@ void SyncUser::update_refresh_token(std::string token)
         if (auto manager = SyncManager::shared().metadata_manager()) {
             // Update persistent user metadata.
             auto metadata = SyncUserMetadata(*manager, m_identity);
-            metadata.set_state(server_url, token);
+            metadata.set_state(m_server_url, token);
         }
     }
     // (Re)activate all pending sessions.

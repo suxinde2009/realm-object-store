@@ -25,6 +25,8 @@
 #include <vector>
 #include <mutex>
 
+#include <realm/util/optional.hpp>
+
 namespace realm {
 
 class SyncSession;
@@ -41,7 +43,10 @@ public:
     };
 
     // Don't use this directly; use the `SyncManager` APIs. Public for use with `make_shared`.
-    SyncUser(std::string refresh_token, std::string identity, bool is_admin=false);
+    SyncUser(std::string refresh_token,
+             std::string identity,
+             util::Optional<std::string> server_url,
+             bool is_admin=false);
 
     // Return a list of all sessions belonging to this user.
     std::vector<std::shared_ptr<SyncSession>> all_sessions();
@@ -67,6 +72,12 @@ public:
         return m_identity;
     }
 
+    // FIXME: remove this APIs once the new token system is implemented.
+    const std::string& server_url() const
+    {
+        return m_server_url;
+    }
+
     std::string refresh_token() const;
     State state() const;
 
@@ -75,13 +86,13 @@ public:
     // immediately, or upon the user becoming Active.
     void register_session(std::shared_ptr<SyncSession> session);
 
+private:
+    State m_state;
+
     // The auth server URL. Bindings should set this appropriately when they retrieve
     // instances of `SyncUser`s.
     // FIXME: once the new token system is implemented, this can be removed completely.
-    std::string server_url;
-
-private:
-    State m_state;
+    std::string m_server_url;
 
     // Mark the user as invalid, since a fatal user-related error was encountered.
     void invalidate();
