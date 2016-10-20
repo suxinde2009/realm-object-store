@@ -39,9 +39,20 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
                                         MetadataMode metadata_mode,
                                         util::Optional<std::vector<char>> custom_encryption_key)
 {
+    std::lock_guard<std::mutex> lock(m_configure_file_system_mutex);
+
+    // Set up the file manager.
+    if (m_file_manager) {
+        REALM_ASSERT(m_file_manager->base_path() == base_file_path);
+    } else {
+        m_file_manager = std::make_unique<SyncFileManager>(base_file_path);
+    }
+
+    // Set up the metadata manager, and perform initial loading/purging work.
+    if (m_metadata_manager) {
+        return;
+    }
     std::vector<std::tuple<std::string, std::shared_ptr<SyncUser>>> users_to_add;
-    REALM_ASSERT(!m_file_manager && !m_metadata_manager);   // Can only call this once
-    m_file_manager = std::make_unique<SyncFileManager>(base_file_path);
     switch (metadata_mode) {
         case MetadataMode::NoEncryption:
             m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
