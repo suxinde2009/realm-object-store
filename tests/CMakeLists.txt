@@ -25,7 +25,11 @@ set(SOURCES
 )
 
 if(REALM_ENABLE_SYNC)
-    list(APPEND SOURCES sync.cpp sync/sync_file.cpp)
+    list(APPEND SOURCES 
+        sync.cpp
+        sync/file.cpp
+        sync/metadata.cpp
+    )
 endif()
 
 add_executable(tests ${SOURCES} ${HEADERS})
