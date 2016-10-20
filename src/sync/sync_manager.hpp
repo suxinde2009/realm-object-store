@@ -23,6 +23,7 @@
 
 #include <realm/sync/client.hpp>
 #include <realm/util/logger.hpp>
+#include <realm/util/optional.hpp>
 
 #include <memory>
 #include <mutex>
@@ -90,7 +91,10 @@ public:
 
     // Get a sync user for a given identity, or create one if none exists yet, and set its token.
     // If a logged-out user exists, it will marked as logged back in.
-    std::shared_ptr<SyncUser> get_user(const std::string& identity, std::string refresh_token, bool is_admin=false);
+    std::shared_ptr<SyncUser> get_user(const std::string& identity,
+                                       std::string refresh_token,
+                                       util::Optional<std::string> auth_server_url=none,
+                                       bool is_admin=false);
     // Get an existing user for a given identity, if one exists and is logged in.
     std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& identity) const;
     // Get all the users.
@@ -102,6 +106,7 @@ public:
     // Reset part of the singleton state for testing purposes. DO NOT CALL OUTSIDE OF TESTING CODE.
     void reset_for_testing();
 private:
+    struct UserCreationData;
     void dropped_last_reference_to_session(SyncSession*);
 
     // Stop tracking the session for the given path if it is inactive.
@@ -120,7 +125,6 @@ private:
     std::unique_ptr<SyncSession> get_existing_inactive_session_locked(const std::string& path);
 
     mutable std::mutex m_mutex;
-    mutable std::mutex m_configure_file_system_mutex;
 
     // FIXME: Should probably be util::Logger::Level::error
     util::Logger::Level m_log_level = util::Logger::Level::info;
@@ -140,6 +144,8 @@ private:
     // Protects m_active_sessions and m_inactive_sessions
     mutable std::mutex m_session_mutex;
 
+    // Protects m_file_manager and m_metadata_manager
+    mutable std::mutex m_file_system_mutex;
     std::unique_ptr<SyncFileManager> m_file_manager;
     std::unique_ptr<SyncMetadataManager> m_metadata_manager;
 
