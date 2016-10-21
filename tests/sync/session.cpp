@@ -120,3 +120,5 @@ TEST_CASE("sync: log-in", "[sync]") {
     // Cleanup
     SyncManager::shared().reset_for_testing();
 }
+
+// TODO: tests investigating the interaction of SyncUser and SyncSession

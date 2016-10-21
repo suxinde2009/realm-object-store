@@ -16,10 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch.hpp"
+#include "sync_test_utils.hpp"
 
 #include "shared_realm.hpp"
-#include "sync/impl/sync_file.hpp"
 #include <realm/util/file.hpp>
 
 using namespace realm;
@@ -35,32 +34,6 @@ static void prepare_sync_manager_test(void) {
     util::make_dir(base_path);
     util::make_dir(manager_path);
 }
-
-/// Open a Realm at a given path, creating its files.
-static bool create_dummy_realm(std::string path) {
-    Realm::Config config;
-    config.path = std::move(path);
-    try {
-        return Realm::make_shared_realm(config) != nullptr;
-    } catch(std::exception) {
-        return false;
-    }
-}
-
-#define REQUIRE_DIR_EXISTS(macro_path) \
-{ \
-    DIR *dir_listing = opendir((macro_path).c_str()); \
-    REQUIRE(dir_listing); \
-    if (dir_listing) closedir(dir_listing); \
-}
-
-#define REQUIRE_DIR_DOES_NOT_EXIST(macro_path) \
-{ \
-    DIR *dir_listing = opendir((macro_path).c_str()); \
-    REQUIRE(dir_listing == NULL); \
-    if (dir_listing) closedir(dir_listing); \
-}
-
 
 TEST_CASE("sync_file: percent-encoding APIs") {
     SECTION("does not encode a string that has no restricted characters") {

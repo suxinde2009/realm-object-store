@@ -16,10 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch.hpp"
+#include "sync_test_utils.hpp"
 
-#include "sync/impl/sync_metadata.hpp"
-#include "sync/impl/sync_file.hpp"
 #include <realm/util/file.hpp>
 
 using namespace realm;
@@ -29,35 +27,8 @@ using File = realm::util::File;
 static const std::string base_path = "/tmp/realm_objectstore_sync_metadata/";
 static const std::string metadata_path = base_path + "/metadata.realm";
 
-namespace {
-
-void reset_test_directory() {
-	remove_nonempty_dir(base_path);
-    util::make_dir(base_path);
-}
-
-bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity) {
-	for (size_t i = 0; i < results.size(); i++) {
-		if (results.get(i).identity() == identity) {
-			return true;
-		}
-	}
-	return false;
-}
-
-std::vector<char> make_test_encryption_key(const char start = 0) {
-	std::vector<char> vector;
-	vector.reserve(64);
-	for (int i=0; i<64; i++) {
-		vector.emplace_back((start + i) % 128);
-	}
-	return vector;
-}
-
-}
-
 TEST_CASE("sync_metadata: user metadata") {
-	reset_test_directory();
+	reset_test_directory(base_path);
 	SyncMetadataManager manager(metadata_path, false);
 
 	SECTION("can be properly constructed") {
@@ -155,9 +126,8 @@ TEST_CASE("sync_metadata: user metadata") {
 	}
 }
 
-
 TEST_CASE("sync_metadata: user metadata APIs") {
-	reset_test_directory();
+	reset_test_directory(base_path);
 	SyncMetadataManager manager(metadata_path, false);
 
 	SECTION("properly list all marked and unmarked users") {
@@ -188,7 +158,7 @@ TEST_CASE("sync_metadata: user metadata APIs") {
 }
 
 TEST_CASE("sync_metadata: results") {
-	reset_test_directory();
+	reset_test_directory(base_path);
 	SyncMetadataManager manager(metadata_path, false);
 
 	SECTION("properly update as underlying items are added") {
@@ -234,7 +204,7 @@ TEST_CASE("sync_metadata: results") {
 }
 
 TEST_CASE("sync_metadata: persistence across metadata manager instances") {
-	reset_test_directory();
+	reset_test_directory(base_path);
 
 	SECTION("works for the basic case") {
 		const auto identity = "testcase4a";
@@ -255,7 +225,7 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances") {
 }
 
 TEST_CASE("sync_metadata: encryption") {
-	reset_test_directory();
+	reset_test_directory(base_path);
 
 	SECTION("prohibits opening the metadata Realm with different keys") {
 		SECTION("different keys") {

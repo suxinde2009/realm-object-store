@@ -106,9 +106,9 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
     {
         std::lock_guard<std::mutex> lock(m_user_mutex);
         for (auto& user_data : users_to_add) {
-            m_users.insert({ user_data.identity, std::make_shared<SyncUser>(std::move(user_data.user_token),
-                                                                            std::move(user_data.identity),
-                                                                            std::move(user_data.server_url)) });
+            m_users.insert({ user_data.identity, std::make_shared<SyncUser>(user_data.user_token,
+                                                                            user_data.identity,
+                                                                            user_data.server_url) });
         }
     }
 }

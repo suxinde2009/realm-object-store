@@ -92,11 +92,11 @@ void SyncUser::update_refresh_token(std::string token)
             case State::Error:
                 return;
             case State::Active:
-                m_refresh_token = std::move(token);
+                m_refresh_token = token;
                 break;
             case State::LoggedOut: {
                 sessions_to_revive.reserve(m_waiting_sessions.size());
-                m_refresh_token = std::move(token);
+                m_refresh_token = token;
                 m_state = State::Active;
                 for (auto& pair : m_waiting_sessions) {
                     if (auto ptr = pair.second.lock()) {

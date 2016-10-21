@@ -57,7 +57,7 @@ public:
     // Update the user's refresh token. If the user is logged out, it will log itself back in.
     void update_refresh_token(std::string token);
 
-    // Log the user out and mark it as invalid. This will also close its associated Sessions.
+    // Log the user out and mark it as such. This will also close its associated Sessions.
     void log_out();
 
     // Whether the user was configured as an 'admin user' (directly uses its user token

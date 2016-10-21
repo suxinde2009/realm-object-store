@@ -25,10 +25,16 @@ set(SOURCES
 )
 
 if(REALM_ENABLE_SYNC)
+    list(APPEND HEADERS
+        sync/sync_test_utils.hpp
+    )
     list(APPEND SOURCES 
-        sync.cpp
         sync/file.cpp
         sync/metadata.cpp
+        sync/session.cpp
+        sync/sync_manager.cpp
+        sync/sync_test_utils.cpp
+        sync/user.cpp
     )
 endif()
 
