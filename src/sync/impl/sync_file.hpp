@@ -56,7 +56,7 @@ public:
     std::string user_directory(const std::string& user_identity);
 
     /// Remove the user directory for a given user.
-    void remove_user_directory(const std::string& user_identity);
+    void remove_user_directory(const std::string& user_identity);       // throws
 
     /// Return the path for a given Realm, creating the user directory if it does not already exist.
     std::string path(const std::string& user_identity, const std::string& raw_realm_path);

@@ -79,7 +79,7 @@ TEST_CASE("sync_manager: `path_for_realm` API") {
 	SECTION("should work properly") {
 		const std::string identity = "foobarbaz";
 		const std::string raw_url = "realms://foo.bar.example.com/realm/something/~/123456/xyz";
-		const auto expected = base_path + "realm-object-server/foobarbaz/realms%3A%2F%2Ffoo%2Ebar%2Eexample%2Ecom%2Frealm%2Fsomething%2F%7E%2F123456%2Fxyz";
+		const auto expected = base_path + "realm-object-server/foobarbaz/realms%3A%2F%2Ffoo.bar.example.com%2Frealm%2Fsomething%2F%7E%2F123456%2Fxyz";
 		REQUIRE(SyncManager::shared().path_for_realm(identity, raw_url) == expected);
 		// This API should also generate the directory if it doesn't already exist.
 		REQUIRE_DIR_EXISTS(base_path + "realm-object-server/foobarbaz/");

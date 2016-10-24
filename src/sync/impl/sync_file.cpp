@@ -39,12 +39,16 @@ uint8_t value_of_hex_digit(char hex_digit)
     }
 }
 
+bool filename_is_reserved(const std::string& filename) {
+    return (filename == "." || filename == "..");
+}
+
 bool character_is_unreserved(char character)
 {
     bool is_capital_letter = (character >= 'A' && character <= 'Z');
     bool is_lowercase_letter = (character >= 'a' && character <= 'z');
     bool is_number = (character >= '0' && character <= '9');
-    bool is_allowed_symbol = (character == '-' || character == '_');
+    bool is_allowed_symbol = (character == '-' || character == '_' || character == '.');
     return is_capital_letter || is_lowercase_letter || is_number || is_allowed_symbol;
 }
 
@@ -210,6 +214,9 @@ std::string SyncFileManager::get_base_sync_directory()
 std::string SyncFileManager::user_directory(const std::string& user_identity)
 {
     REALM_ASSERT(user_identity.length() > 0);
+    if (filename_is_reserved(user_identity)) {
+        throw std::invalid_argument("A user can't have an identifier reserved by the filesystem.");
+    }
     auto user_path = file_path_by_appending_component(get_base_sync_directory(),
                                                       user_identity,
                                                       util::FilePathType::Directory);
@@ -220,21 +227,22 @@ std::string SyncFileManager::user_directory(const std::string& user_identity)
 void SyncFileManager::remove_user_directory(const std::string& user_identity)
 {
     REALM_ASSERT(user_identity.length() > 0);
+    if (filename_is_reserved(user_identity)) {
+        throw std::invalid_argument("A user can't have an identifier reserved by the filesystem.");
+    }
     auto user_path = file_path_by_appending_component(get_base_sync_directory(),
                                                       user_identity,
-                                                      util::FilePathType
-                                                      ::Directory);
-    try {
-        util::remove_nonempty_dir(user_path);
-    }
-    catch(File::AccessError) {
-    }
+                                                      util::FilePathType::Directory);
+    util::remove_nonempty_dir(user_path);
 }
 
 bool SyncFileManager::remove_realm(const std::string& user_identity, const std::string& raw_realm_path)
 {
     REALM_ASSERT(user_identity.length() > 0);
     REALM_ASSERT(raw_realm_path.length() > 0);
+    if (filename_is_reserved(user_identity) || filename_is_reserved(raw_realm_path)) {
+        throw std::invalid_argument("A user or Realm can't have an identifier reserved by the filesystem.");
+    }
     auto escaped = util::make_percent_encoded_string(raw_realm_path);
     auto realm_path = util::file_path_by_appending_component(user_directory(user_identity), std::move(escaped));
     bool success = true;
@@ -274,6 +282,9 @@ std::string SyncFileManager::path(const std::string& user_identity, const std::s
 {
     REALM_ASSERT(user_identity.length() > 0);
     REALM_ASSERT(raw_realm_path.length() > 0);
+    if (filename_is_reserved(user_identity) || filename_is_reserved(raw_realm_path)) {
+        throw std::invalid_argument("A user or Realm can't have an identifier reserved by the filesystem.");
+    }
     auto escaped = util::make_percent_encoded_string(raw_realm_path);
     auto realm_path = util::file_path_by_appending_component(user_directory(user_identity), std::move(escaped));
     return realm_path;

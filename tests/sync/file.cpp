@@ -43,7 +43,7 @@ TEST_CASE("sync_file: percent-encoding APIs") {
     }
 
     SECTION("properly encodes a sample Realm URL") {
-        const std::string expected = "realms%3A%2F%2Fexample%2Ecom%2F%7E%2Ffoo_bar%2Fuser-realm";
+        const std::string expected = "realms%3A%2F%2Fexample.com%2F%7E%2Ffoo_bar%2Fuser-realm";
         const std::string raw_string = "realms://example.com/~/foo_bar/user-realm";
         auto actual = make_percent_encoded_string(raw_string);
         REQUIRE(actual == expected);
@@ -51,7 +51,7 @@ TEST_CASE("sync_file: percent-encoding APIs") {
 
     SECTION("properly decodes a sample Realm URL") {
         const std::string expected = "realms://example.com/~/foo_bar/user-realm";
-        const std::string encoded_string = "realms%3A%2F%2Fexample%2Ecom%2F%7E%2Ffoo_bar%2Fuser-realm";
+        const std::string encoded_string = "realms%3A%2F%2Fexample.com%2F%7E%2Ffoo_bar%2Fuser-realm";
         auto actual = make_raw_string(encoded_string);
         REQUIRE(actual == expected);
     }
@@ -164,7 +164,7 @@ TEST_CASE("sync_file: SyncFileManager APIs") {
         auto relative_path = "realms://r.example.com/~/my/realm/path";
 
         SECTION("getting a Realm path") {
-            const std::string expected = manager_path + "realm-object-server/123456789/realms%3A%2F%2Fr%2Eexample%2Ecom%2F%7E%2Fmy%2Frealm%2Fpath";
+            const std::string expected = manager_path + "realm-object-server/123456789/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
             auto actual = manager.path(identity, relative_path);
             REQUIRE(expected == actual);
         }
@@ -172,7 +172,7 @@ TEST_CASE("sync_file: SyncFileManager APIs") {
         SECTION("deleting a Realm for a valid user") {
             manager.path(identity, relative_path);
             // Create the required files
-            auto realm_base_path = manager_path + "realm-object-server/123456789/realms%3A%2F%2Fr%2Eexample%2Ecom%2F%7E%2Fmy%2Frealm%2Fpath";
+            auto realm_base_path = manager_path + "realm-object-server/123456789/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
             REQUIRE(create_dummy_realm(realm_base_path));
             REQUIRE(File::exists(realm_base_path));
             REQUIRE(File::exists(realm_base_path + ".lock"));

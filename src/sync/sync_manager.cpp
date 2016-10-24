@@ -96,8 +96,12 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
             auto user = users_to_remove.get(i);
             // FIXME: delete user data in a different way? (This deletes a logged-out user's data as soon as the app
             // launches again, which might not be how some apps want to treat their data.)
-            m_file_manager->remove_user_directory(user.identity());
-            dead_users.emplace_back(std::move(user));
+            try {
+                m_file_manager->remove_user_directory(user.identity());
+                dead_users.emplace_back(std::move(user));
+            } catch (util::File::AccessError) {
+                continue;
+            }
         }
         for (auto& user : dead_users) {
             user.remove();
