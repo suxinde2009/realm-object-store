@@ -22,7 +22,7 @@ Please report bugs against the Realm product that you're using:
 
 ## Supported Platforms
 
-The object store's CMake build system currently only suports building for OS X and Linux. Building for Linux requires
+The object store's CMake build system currently only suports building for OS X, Linux, and Android. Building for Linux requires
 [building against a local version of core](#building-against-a-local-version-of-core).
 
 The object store code supports being built for all Apple platforms, Linux and Android when used along with the relevant Realm product's build system.
@@ -45,6 +45,12 @@ The object store code supports being built for all Apple platforms, Linux and An
     cmake .
     ```
 
+    If building for Android, the path for the Android NDK must be specified. For example, if it was installed with homebrew:
+
+    ```
+    cmake -DREALM_PLATFORM=Android -DANDROID_NDK=/usr/local/Cellar/android-ndk-r10e/r10e/ .
+    ```
+
 4. Build:
 
     ```
@@ -60,6 +66,16 @@ cmake -DREALM_CORE_VERSION=/path/to/realm-core
 ```
 
 The given core tree will be built as part of the object store build.
+
+### Building with Sync
+
+Specify the path to realm-core and realm-sync when invoking `cmake`:
+
+```
+cmake -DREALM_CORE_VERSION=/path/to/realm-core -DREALM_SYNC_PREFIX=/path/to/realm-sync
+```
+
+Prebuilt sync binaries are currently not supported.
 
 ### Building with Sanitizers
 
