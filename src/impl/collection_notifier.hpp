@@ -48,7 +48,7 @@ struct TransactionChangeInfo {
     std::vector<bool> table_moves_needed;
     std::vector<ListChangeInfo> lists;
     std::vector<CollectionChangeBuilder> tables;
-    bool track_all = false;
+    bool track_all; // = false; [With this in place, IncrementalChangeInfo::advance_incremental() fails to compile on Android]
 };
 
 class DeepChangeChecker {
