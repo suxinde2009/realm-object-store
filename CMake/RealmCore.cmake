@@ -67,15 +67,14 @@ function(use_realm_core enable_sync core_prefix sync_prefix)
   if(core_prefix)
     build_existing_realm_core(${core_prefix})
     if(sync_prefix)
-      build_realm_sync(${sync_prefix})
+      build_existing_realm_sync(${sync_prefix})
     endif()
   elseif(enable_sync)
     if(APPLE OR REALM_PLATFORM STREQUAL "Android")
       download_realm_sync(${REALM_SYNC_VERSION})
     else()
-      # FIXME: Download and build both core and sync from source.
-      message(FATAL_ERROR "Prebuilt binaries of Realm Sync are not available for ${CMAKE_SYSTEM}. "
-                          "You must build those components from source.")
+      clone_and_build_realm_core("v${REALM_CORE_VERSION}")
+      clone_and_build_realm_sync("v${REALM_SYNC_VERSION}")
     endif()
   else()
     if(APPLE OR REALM_PLATFORM STREQUAL "Android")
@@ -225,54 +224,56 @@ function(download_realm_sync sync_version)
     set_property(TARGET realm-sync-server PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES})
 endfunction()
 
-function(clone_and_build_realm_core branch)
+macro(build_realm_core)
     set(core_prefix_directory "${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-core")
     ExternalProject_Add(realm-core
-        GIT_REPOSITORY "https://github.com/realm/realm-core.git"
-        GIT_TAG ${branch}
         PREFIX ${core_prefix_directory}
         BUILD_IN_SOURCE 1
-        CONFIGURE_COMMAND sh build.sh config
         BUILD_COMMAND make -C src/realm librealm.a librealm-dbg.a ${MAKE_FLAGS}
         INSTALL_COMMAND ""
+        CONFIGURE_COMMAND ""
         ${USES_TERMINAL_BUILD}
+        ${ARGV}
         )
 
     ExternalProject_Get_Property(realm-core SOURCE_DIR)
     define_realm_core_target(NO ${SOURCE_DIR})
+endmacro()
+
+function(clone_and_build_realm_core branch)
+    build_realm_core(GIT_REPOSITORY "https://github.com/realm/realm-core.git"
+                     GIT_TAG ${branch}
+                     CONFIGURE_COMMAND test -f src/config.mk ||
+                                       REALM_ENABLE_ENCRYPTION=YES REALM_ENABLE_ASSERTIONS=YES sh build.sh config
+                     )
 endfunction()
 
 function(build_existing_realm_core core_directory)
     get_filename_component(core_directory ${core_directory} ABSOLUTE)
-    ExternalProject_Add(realm-core
-        URL ""
-        PREFIX ${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-core
-        SOURCE_DIR ${core_directory}
-        BUILD_IN_SOURCE 1
-        BUILD_ALWAYS 1
-        CONFIGURE_COMMAND ""
-        BUILD_COMMAND make -C src/realm librealm.a librealm-dbg.a ${MAKE_FLAGS}
-        INSTALL_COMMAND ""
-        ${USES_TERMINAL_BUILD}
-        )
+    set(core_prefix_directory "${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-core")
 
-    define_realm_core_target(NO ${core_directory})
+    build_realm_core(URL ""
+                     SOURCE_DIR ${core_directory}
+                     BUILD_ALWAYS 1
+                     )
 endfunction()
 
-function(build_realm_sync sync_directory)
-    get_filename_component(sync_directory ${sync_directory} ABSOLUTE)
+macro(build_realm_sync)
+    set(cmake_files ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY})
     ExternalProject_Add(realm-sync-lib
         DEPENDS realm-core
-        URL ""
-        PREFIX ${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync
-        SOURCE_DIR ${sync_directory}
+        PREFIX ${cmake_files}/realm-sync
         BUILD_IN_SOURCE 1
-        BUILD_ALWAYS 1
-        CONFIGURE_COMMAND ""
         BUILD_COMMAND make -C src/realm librealm-sync.a librealm-sync-dbg.a librealm-server.a librealm-server-dbg.a ${MAKE_FLAGS}
+        CONFIGURE_COMMAND ""
         INSTALL_COMMAND ""
         ${USES_TERMINAL_BUILD}
+        ${ARGV}
         )
+
+    ExternalProject_Get_Property(realm-sync-lib SOURCE_DIR)
+    set(sync_directory ${SOURCE_DIR})
+
     set(sync_library_debug ${sync_directory}/src/realm/librealm-sync-dbg.a)
     set(sync_library_release ${sync_directory}/src/realm/librealm-sync.a)
     set(sync_libraries ${sync_library_debug} ${sync_library_release})
@@ -294,27 +295,18 @@ function(build_realm_sync sync_directory)
     set_property(TARGET realm-sync PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES})
 
     # Sync server library is built as part of the sync library build
-    ExternalProject_Add(realm-server-lib
-        DEPENDS realm-core
-        DOWNLOAD_COMMAND ""
-        PREFIX ${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync
-        SOURCE_DIR ${sync_directory}
-        CONFIGURE_COMMAND ""
-        BUILD_COMMAND ""
-        INSTALL_COMMAND ""
-        )
     set(sync_server_library_debug ${sync_directory}/src/realm/librealm-server-dbg.a)
     set(sync_server_library_release ${sync_directory}/src/realm/librealm-server.a)
     set(sync_server_libraries ${sync_server_library_debug} ${sync_server_library_release})
 
-    ExternalProject_Add_Step(realm-server-lib ensure-server-libraries
+    ExternalProject_Add_Step(realm-sync-lib ensure-server-libraries
         COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${sync_server_libraries}
         OUTPUT ${sync_server_libraries}
         DEPENDEES build
         )
 
     add_library(realm-sync-server STATIC IMPORTED)
-    add_dependencies(realm-sync-server realm-server-lib)
+    add_dependencies(realm-sync-server realm-sync-lib)
 
     set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION_DEBUG ${sync_server_library_debug})
     set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION_COVERAGE ${sync_server_library_debug})
@@ -325,4 +317,22 @@ function(build_realm_sync sync_directory)
     set_property(TARGET realm-sync-server PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES} ${YAML_LDFLAGS})
 
     set(REALM_SYNC_INCLUDE_DIR ${sync_directory}/src PARENT_SCOPE)
+endmacro()
+
+function(build_existing_realm_sync sync_directory)
+    get_filename_component(sync_directory ${sync_directory} ABSOLUTE)
+    build_realm_sync(URL ""
+                     SOURCE_DIR ${sync_directory}
+                     BUILD_ALWAYS 1
+                     )
+
+endfunction()
+
+function(clone_and_build_realm_sync branch)
+    build_realm_sync(GIT_REPOSITORY "git@github.com:realm/realm-sync.git"
+                     GIT_TAG ${branch}
+                     CONFIGURE_COMMAND test -f src/config.mk ||
+                                       REALM_CORE_PREFIX=${cmake_files}/realm-core/src/realm-core sh build.sh config
+                     )
+
 endfunction()
