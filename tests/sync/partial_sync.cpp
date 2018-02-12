@@ -116,6 +116,20 @@ void populate_realm(Realm::Config& config, std::vector<TypeA> a={}, std::vector<
 void run_query(const std::string& query, const Realm::Config& partial_config, PartialSyncTestObjects type,
                    std::function<void(Results, std::exception_ptr)> check)
 {
+    auto realm = Realm::get_shared_realm(config);
+    auto table = ObjectStore::table_for_object_type(realm->read_group(), object_type);
+    Query query = table->where();
+    auto parser_result = realm::parser::parse(query_string);
+    query_builder::apply_predicate(query, parser_result.predicate);
+
+    DescriptorOrdering ordering;
+    query_builder::apply_ordering(ordering, table, parser_result.ordering);
+    return Results(std::move(realm), std::move(query), std::move(ordering));
+}
+
+partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<std::string> name,
+                                              std::function<void(Results, std::exception_ptr)> check)
+{
     std::atomic<bool> partial_sync_done(false);
     auto r = Realm::get_shared_realm(partial_config);
     Results results;
@@ -254,11 +268,25 @@ TEST_CASE("Partial sync error checking", "[sync]") {
         CHECK_THROWS(partial_sync::register_query(realm, "object", "query", [&](Results, std::exception_ptr) { }));
     }
 
-    SECTION("query on type that doesn't exist") {
-        SyncServer server;
-        SyncTestFile config(server, "test", partial_sync_schema(), true);
-        auto realm = Realm::get_shared_realm(config);
-        CHECK_THROWS(partial_sync::register_query(realm, "this type doesn't exist", "query",
-                                                  [&](Results, std::exception_ptr) { }));
+
+    SECTION("unsupported queries should raise an error") {
+        // To test handling of invalid queries, we rely on the fact that core does not yet support `links_to`
+        // queries as it cannot serialize an object reference until we have stable ID support.
+
+        // Ensure that the placeholder object in `link_target` is available.
+        subscribe_and_wait("TRUEPREDICATE", partial_config, "link_target", util::none, [](Results results, std::exception_ptr error) {
+                REQUIRE(!error);
+                REQUIRE(results.size() == 1);
+            });
+
+        auto r = Realm::get_shared_realm(partial_config);
+        const auto& object_schema = r->schema().find("object_a");
+        auto source_table = ObjectStore::table_for_object_type(r->read_group(), "object_a");
+        auto target_table = ObjectStore::table_for_object_type(r->read_group(), "link_target");
+
+        // Attempt to subscribe to a `links_to` query.
+        Query q = source_table->where().links_to(object_schema->property_for_name("link")->table_column,
+                                                     target_table->get(0));
+        CHECK_THROWS(partial_sync::subscribe(Results(r, q), util::none));
     }
 }
