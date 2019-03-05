@@ -55,23 +55,48 @@ public:
     virtual std::unique_ptr<util::Logger> make_logger(util::Logger::Level) = 0;
 };
 
-class SyncManager {
-friend class SyncSession;
-public:
+struct SyncClientConfig {
+    using ReconnectMode = sync::Client::ReconnectMode;
     enum class MetadataMode {
         NoEncryption,                   // Enable metadata, but disable encryption.
         Encryption,                     // Enable metadata, and use encryption (automatic if possible).
         NoMetadata,                     // Disable metadata.
     };
 
+    std::string base_file_path;
+    MetadataMode metadata_mode = MetadataMode::Encryption;
+    util::Optional<std::vector<char>> custom_encryption_key;
+    bool reset_metadata_on_error = false;;
+
+    SyncLoggerFactory* logger_factory = nullptr;
+    // FIXME: Should probably be util::Logger::Level::error
+    util::Logger::Level log_level = util::Logger::Level::info;
+    ReconnectMode reconnect_mode = ReconnectMode::normal;
+    bool multiplex_sessions = false;
+
+    // Optional information about the binding/application that is sent as part of the User-Agent
+    // when establishing a connection to the server.
+    std::string user_agent_binding_info;
+    std::string user_agent_application_info;
+
+    // See sync::Client::Config for the meaning of these fields. The default
+    // values from there are used if these are 0.
+    uint64_t connect_timeout = 0;
+    uint64_t connection_linger_time = 0;
+    uint64_t ping_keepalive_period = 0;
+    uint64_t pong_keepalive_timeout = 0;
+    uint64_t fast_reconnect_limit = 0;
+};
+
+class SyncManager {
+friend class SyncSession;
+public:
+    using MetadataMode = SyncClientConfig::MetadataMode;
+
     static SyncManager& shared();
 
     // Configure the metadata and file management subsystems. This MUST be called upon startup.
-    void configure(const std::string& base_file_path,
-                               MetadataMode metadata_mode=MetadataMode::Encryption,
-                               const std::string& user_agent_binding_info = "",
-                               util::Optional<std::vector<char>> custom_encryption_key=none,
-                               bool reset_metadata_on_error=false);
+    void configure(SyncClientConfig config);
 
     // Immediately run file actions for a single Realm at a given original path.
     // Returns whether or not a file action was successfully executed for the specified Realm.
@@ -188,11 +213,6 @@ private:
 
     mutable std::mutex m_mutex;
 
-    // FIXME: Should probably be util::Logger::Level::error
-    util::Logger::Level m_log_level = util::Logger::Level::info;
-    SyncLoggerFactory* m_logger_factory = nullptr;
-    ReconnectMode m_client_reconnect_mode = ReconnectMode::normal;
-
     bool run_file_action(const SyncFileActionMetadata&);
 
     // Protects m_users
@@ -204,12 +224,8 @@ private:
     std::unordered_map<std::string, std::shared_ptr<SyncUser>> m_admin_token_users;
 
     mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
-    bool m_multiplex_sessions = false;
 
-    // Optional information about the binding/application that is sent as part of the User-Agent
-    // when establishing a connection to the server.
-    std::string m_user_agent_binding_info;
-    std::string m_user_agent_application_info;
+    SyncClientConfig m_config;
 
     // Protects m_file_manager and m_metadata_manager
     mutable std::mutex m_file_system_mutex;

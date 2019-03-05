@@ -39,8 +39,8 @@ namespace _impl {
 using ReconnectMode = sync::Client::ReconnectMode;
 
 struct SyncClient {
-    SyncClient(std::unique_ptr<util::Logger> logger, ReconnectMode reconnect_mode, bool multiplex_sessions, const std::string& user_agent_application_info)
-        : m_client(make_client(*logger, reconnect_mode, multiplex_sessions, user_agent_application_info)) // Throws
+    SyncClient(std::unique_ptr<util::Logger> logger, SyncClientConfig const& config)
+        : m_client(make_client(*logger, config)) // Throws
         , m_logger(std::move(logger))
         , m_thread([this] {
             if (g_binding_callback_thread_observer) {
@@ -96,13 +96,25 @@ struct SyncClient {
     }
 
 private:
-    static sync::Client make_client(util::Logger& logger, ReconnectMode reconnect_mode, bool multiplex_sessions, const std::string& user_agent_application_info)
+    static sync::Client make_client(util::Logger& logger, SyncClientConfig const& c)
     {
         sync::Client::Config config;
         config.logger = &logger;
-        config.reconnect_mode = std::move(reconnect_mode);
-        config.one_connection_per_session = !multiplex_sessions;
-        config.user_agent_application_info = user_agent_application_info;
+        config.reconnect_mode = c.reconnect_mode;
+        config.one_connection_per_session = !c.multiplex_sessions;
+        config.user_agent_application_info = util::format("%1 %1", c.user_agent_binding_info, c.user_agent_application_info);
+
+        if (c.connect_timeout)
+            config.connect_timeout = c.connect_timeout;
+        if (c.connection_linger_time)
+            config.connection_linger_time = c.connection_linger_time;
+        if (c.ping_keepalive_period)
+            config.ping_keepalive_period = c.ping_keepalive_period;
+        if (c.pong_keepalive_timeout)
+            config.pong_keepalive_timeout = c.pong_keepalive_timeout;
+        if (c.fast_reconnect_limit)
+            config.fast_reconnect_limit = c.fast_reconnect_limit;
+
         return sync::Client(std::move(config)); // Throws
     }
 
