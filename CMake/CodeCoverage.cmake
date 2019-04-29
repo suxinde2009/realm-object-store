@@ -35,7 +35,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
       COMMAND ${LCOV_PATH} --directory . --zerocounters
 
       # Run the tests
-      COMMAND ${testrunner}
+      COMMAND ${testrunner} --durations=yes
 
       # Generate new coverage report
       COMMAND ${LCOV_PATH} --directory . --capture --output-file coverage.info
